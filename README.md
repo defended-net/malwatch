@@ -6,6 +6,8 @@
                            defended.net
 </pre>
 
+![GitHub License](https://img.shields.io/github/license/defended-net/malwatch) [![Go Report Card](https://goreportcard.com/badge/github.com/defended-net/malwatch)](https://goreportcard.com/report/github.com/defended-net/malwatch)
+
 Malwatch is a fast and lightweight malware scanner written in `go` that is ideal for Linux based web server environments. It is capable of scaling to any requirements and is currently used with some of the internet's largest deployments.
 
 Besides excellent detection rates, key design considerations are low resource usage and high performance. A powerful and easy to understand api is provided to cover your alerting requirements and platform integration.
@@ -42,6 +44,11 @@ It would be recommended to set up your `PATH`:
 
     export PATH=$PATH:/opt/malwatch
 
+Alternatively symlinks could be used:
+
+    ln -s /opt/malwatch/malwatch /usr/local/bin/malwatch
+    ln -s /opt/malwatch/malwatch-monitor /usr/local/bin/malwatch-monitor
+
 Config files will automatically be built in the binary's path upon execution. Let's try:
 
     malwatch
@@ -61,9 +68,9 @@ Using `systemd`, it is necessary to enable followed by starting it:
 
 ## Cron
 
-`cron` can be used to schedule scans at preferred interval. It is not recommended to use scheduled scans if real time scanning with `malwatch-monitor` is already being used.
+`cron` can be used to schedule scans at preferred intervals. It is not recommended to use scheduled scans if real time scanning with `malwatch-monitor` is already being used.
 
-The command `crontab -e` is used to add or modify cron jobs. The command field can specofy the absolute path `/opt/malwatch/malwatch scan` to automatically scan all targets. An example configuration to scan each day at 01:00 AM is as follows:
+The command `crontab -e` is used to add or modify cron jobs. The command field can specify the absolute path `/opt/malwatch/malwatch scan` to automatically scan all targets. An example configuration to scan each day at 01:00 AM is as follows:
 
     0 1 * * * /opt/malwatch/malwatch scan
 
