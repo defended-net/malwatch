@@ -1,0 +1,60 @@
+version: 2
+builds:
+- id: malwatch
+  binary: malwatch
+  main: ./cmd/malwatch
+  env:
+    - CGO_ENABLED=1
+  ldflags:
+    - -w -s -X github.com/defended-net/malwatch/pkg/boot/env.ver={{.Version}}
+  flags:
+    - -trimpath
+  goos:
+    - linux
+  goarch:
+    - amd64
+- id: malwatch-monitor
+  binary: malwatch-monitor
+  main: ./cmd/malwatch-monitor
+  env:
+    - CGO_ENABLED=1
+  ldflags:
+    - -w -s -X github.com/defended-net/malwatch/pkg/boot/env.ver={{.Version}}
+  flags:
+    - -trimpath
+  goos:
+    - linux
+  goarch:
+    - amd64
+
+archives:
+  - format: tar.gz
+
+changelog:
+  sort: asc
+  filters:
+    exclude:
+      - "^docs:"
+      - "^test:"
+  groups:
+    - title: "Security Fixes"
+      regexp: '^.*?sec(\(.+\))??!?:.+$'
+      order: 100
+    - title: "New Features"
+      regexp: '^.*?feat(\(.+\))??!?:.+$'
+      order: 200
+    - title: "Bug Fixes"
+      regexp: '^.*?(fix|refactor)(\(.+\))??!?:.+$'
+      order: 300
+    - title: Other work
+      order: 9999
+
+release:
+  extra_files:
+  - glob: ./LICENSE
+  - glob: ./README.md
+  footer: >-
+
+    ---
+
+    Please review our [documentation](https://docs.defended.net/malwatch).

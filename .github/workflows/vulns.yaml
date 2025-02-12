@@ -1,0 +1,17 @@
+name: vulns
+
+on: [push]
+
+concurrency:
+  group: ${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  govulncheck:
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    steps:
+      - name: run govulncheck
+        uses: golang/govulncheck-action@v1
+        with:
+          check-latest: true

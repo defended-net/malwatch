@@ -1,0 +1,30 @@
+name: lint
+
+on: [push]
+
+permissions:
+  contents: read
+  pull-requests: read
+
+concurrency:
+  group: ${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  golangci:
+    name: lint
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    steps:
+      - name: checkout
+        uses: actions/checkout@v4
+
+      - name: set up go
+        uses: actions/setup-go@v5
+        with:
+          check-latest: true
+
+      - name: run golangci-lint
+        uses: golangci/golangci-lint-action@v6
+        with:
+          args: --timeout=5m --exclude-dirs='(pkg/yr)'
