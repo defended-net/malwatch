@@ -32,10 +32,6 @@ archives:
 
 changelog:
   sort: asc
-  filters:
-    exclude:
-      - "^docs:"
-      - "^test:"
   groups:
     - title: "Security Fixes"
       regexp: '^.*?sec(\(.+\))??!?:.+$'
@@ -44,8 +40,20 @@ changelog:
       regexp: '^.*?feat(\(.+\))??!?:.+$'
       order: 200
     - title: "Bug Fixes"
-      regexp: '^.*?(fix|refactor)(\(.+\))??!?:.+$'
+      regexp: '^.*?fix(\(.+\))??!?:.+$'
       order: 300
+    - title: "Refactors"
+      regexp: '^.*?refactor(\(.+\))??!?:.+$'
+      order: 400
+    - title: "Tests"
+      regexp: '^.*?test(\(.+\))??!?:.+$'
+      order: 500
+    - title: "CI"
+      regexp: '^.*?ci(\(.+\))??!?:.+$'
+      order: 600
+    - title: "Build"
+      regexp: '^.*?build(\(.+\))??!?:.+$'
+      order: 700
     - title: Other work
       order: 9999
 
