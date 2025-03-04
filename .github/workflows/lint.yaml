@@ -27,4 +27,4 @@ jobs:
       - name: run golangci-lint
         uses: golangci/golangci-lint-action@v6
         with:
-          args: --timeout=5m --exclude-dirs='(pkg/yr)'
+          args: --timeout=5m --exclude-dirs='(third_party)'
