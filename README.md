@@ -36,9 +36,9 @@ There is tremendous value if malwatch is elected to replace your fleet's existin
 
 Create a directory anywhere you prefer, software is meant to be portable. A common choice is `/opt/malwatch`. Then extract the binary there from the downloaded archive:
 
-    wget https://github.com/defended-net/malwatch/releases/download/v1.0.0/malwatch_1.0.0_linux_amd64.tar.gz
+    wget https://github.com/defended-net/malwatch/releases/download/v1.0.2/malwatch_1.0.2_linux_amd64.tar.gz
     mkdir /opt/malwatch
-    tar -C /opt/malwatch -xzvf malwatch_1.0.0_linux_amd64.tar.gz
+    tar -C /opt/malwatch -xzvf malwatch_1.0.2_linux_amd64.tar.gz
 
 It would be recommended to set up your `PATH`:
 
