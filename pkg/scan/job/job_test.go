@@ -180,9 +180,7 @@ func TestActs(t *testing.T) {
 
 func TestTasks(t *testing.T) {
 	var (
-		result = &state.Result{
-			Errs: &state.Errs{},
-		}
+		result = state.NewResult("", state.Paths{})
 
 		task = func(*state.Result) error {
 			return nil
@@ -193,7 +191,7 @@ func TestTasks(t *testing.T) {
 
 	job.Tasks(result)
 
-	got := result.Errs.Get()
+	got := result.Errs()
 
 	if len(got) > 0 {
 		t.Errorf("unexpected tasks errors %v", got)
@@ -202,9 +200,7 @@ func TestTasks(t *testing.T) {
 
 func TestTasksErr(t *testing.T) {
 	var (
-		result = &state.Result{
-			Errs: &state.Errs{},
-		}
+		result = state.NewResult("", state.Paths{})
 
 		task = []func(*state.Result) error{
 			func(*state.Result) error {
@@ -218,7 +214,7 @@ func TestTasksErr(t *testing.T) {
 	job.Tasks(result)
 
 	var (
-		got  = result.Errs.Get()
+		got  = result.Errs()
 		want = []error{io.EOF}
 	)
 
@@ -228,15 +224,17 @@ func TestTasksErr(t *testing.T) {
 }
 
 func TestFilterAct(t *testing.T) {
-	want := &state.Result{
-		Paths: state.Paths{
+	want := state.NewResult(
+		"",
+
+		state.Paths{
 			t.TempDir(): &hit.Meta{
 				Acts: []string{
 					t.Name(),
 				},
 			},
 		},
-	}
+	)
 
 	got := FilterAct(want, t.Name())
 

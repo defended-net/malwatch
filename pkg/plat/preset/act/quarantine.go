@@ -4,6 +4,7 @@
 package act
 
 import (
+	"fmt"
 	"path/filepath"
 
 	"github.com/defended-net/malwatch/pkg/boot/env"
@@ -43,16 +44,11 @@ func (quarantiner *Quarantiner) Act(result *state.Result) error {
 	for path, meta := range result.Paths {
 		dst := fsys.QuarantinePath(quarantiner.dir, path)
 
-		attr := &fsys.Attr{
-			UID:  meta.Attr.UID,
-			GID:  meta.Attr.GID,
-			Mode: meta.Attr.Mode,
-		}
-
 		meta.Status = filepath.Base(dst)
 
-		if err := fsys.Mv(path, dst, attr); err != nil {
-			result.Errs.Add(err)
+		if err := fsys.Mv(path, dst, meta.Attr); err != nil {
+			// try next one.
+			result.AddErr(fmt.Errorf("%w, %v", ErrQuarantineMv, err))
 		}
 	}
 

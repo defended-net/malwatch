@@ -4,6 +4,7 @@
 package act
 
 import (
+	"fmt"
 	"log/slog"
 	"os"
 	"path/filepath"
@@ -12,7 +13,6 @@ import (
 	"github.com/defended-net/malwatch/pkg/boot/env"
 	"github.com/defended-net/malwatch/pkg/boot/env/cfg/secret"
 	"github.com/defended-net/malwatch/pkg/client/s3"
-	"github.com/defended-net/malwatch/pkg/fsys"
 	"github.com/defended-net/malwatch/pkg/scan/state"
 )
 
@@ -53,7 +53,8 @@ func (exiler *Exiler) Act(result *state.Result) error {
 
 	for path, meta := range result.Paths {
 		if err := exiler.transport.Ul(path); err != nil {
-			slog.Error(ErrExileUpload.Error(), "path", path)
+			// try next one.
+			result.AddErr(fmt.Errorf("%w, %v, %v", ErrExileUpload, err, path))
 			continue
 		}
 
@@ -64,7 +65,8 @@ func (exiler *Exiler) Act(result *state.Result) error {
 		}
 
 		if err := os.Remove(path); err != nil {
-			slog.Error(fsys.ErrFileDel.Error(), "path", path)
+			// try next one.
+			result.AddErr(fmt.Errorf("%w, %v, %v", ErrExileDelErr, err, path))
 			continue
 		}
 

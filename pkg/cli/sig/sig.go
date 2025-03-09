@@ -9,11 +9,13 @@ import (
 )
 
 // Update does a sig update.
+// ./malwatch signatures update
 func Update(env *env.Env, _ []string) error {
 	return sig.Update(env)
 }
 
 // Refresh does a sig refresh.
+// ./malwatch signatures refresh
 func Refresh(env *env.Env, _ []string) error {
 	return sig.Refresh(env)
 }

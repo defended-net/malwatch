@@ -126,16 +126,16 @@ func TestLayout(t *testing.T) {
 			os.Args = append([]string{""}, test.input...)
 			flag.Parse()
 
-			unwrapped, err := cmds.Unwrap()
+			cmd, err := cmds.Route()
 			if err != nil && !strings.HasSuffix(err.Error(), test.want) {
-				t.Fatalf("unwrap error: %v", err)
+				t.Fatalf("route error: %v", err)
 			}
 
-			if unwrapped == nil {
+			if cmd == nil {
 				return
 			}
 
-			result := runtime.FuncForPC(reflect.ValueOf(unwrapped.Fn).Pointer()).Name()
+			result := runtime.FuncForPC(reflect.ValueOf(cmd.Fn).Pointer()).Name()
 
 			if !strings.HasSuffix(result, test.want) {
 				t.Errorf("unexpected cli result %v, want %v", result, test.want)

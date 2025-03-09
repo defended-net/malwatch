@@ -19,15 +19,16 @@ type Helps []Help
 // Logo is the logo.
 const Logo = "              __            __      __\n  __ _  ___ _/ /    _____ _/ /_____/ /\n /    \\/ _ `/ / |/|/ / _ `/ __/ __/ _ \\\n/_/_/_/\\_,_/_/|__,__/\\_,_/\\__/\\__/_//_/\n"
 
+// https://developers.google.com/style/code-syntax
 var (
 	// ErrScan means scan help.
-	ErrScan = errors.New("malwatch scan [PATH]")
+	ErrScan = errors.New("malwatch scan [ PATH ]")
 
 	// ErrHistory means history help.
-	ErrHistory = errors.New("malwatch history {get | del} [TARGET | PATH]")
+	ErrHistory = errors.New("malwatch history { get | del } [ TARGET | PATH ]")
 
 	// ErrActs means acts help.
-	ErrActs = errors.New("malwatch actions {get | set | del} PATH SIGNATURE [ACTION...]")
+	ErrActs = errors.New("malwatch actions { get | set | del } PATH SIGNATURE [ ACTION... ]")
 
 	// ErrQuarantine means quarantine help.
 	ErrQuarantine = errors.New("malwatch quarantine PATH")
@@ -36,10 +37,13 @@ var (
 	ErrExile = errors.New("malwatch exile PATH")
 
 	// ErrRestore means restore help.
-	ErrRestore = errors.New("malwatch restore {PATH | SCAN_ID}")
+	ErrRestore = errors.New("malwatch restore { PATH | SCAN_ID }")
+
+	// ErrSubmit means submit help.
+	ErrSubmit = errors.New("malwatch submit PATH")
 
 	// ErrSigs means sig help.
-	ErrSigs = errors.New("malwatch signatures {update | refresh}")
+	ErrSigs = errors.New("malwatch signatures { update | refresh }")
 
 	// ErrInfo means info help.
 	ErrInfo = errors.New("malwatch info")

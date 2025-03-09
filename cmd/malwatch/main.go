@@ -9,6 +9,6 @@ import (
 )
 
 func main() {
-	status, err := cli.Run(cmds)
-	defer cmd.Exit(status, err)
+	state, err := cli.Run(cmds)
+	defer cmd.Exit(state, err)
 }
