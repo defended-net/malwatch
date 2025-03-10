@@ -9,6 +9,6 @@ var (
 	// ErrArgInvalid means invalid args.
 	ErrArgInvalid = errors.New("cli: invalid arg specified")
 
-	// ErrArgMissing means no args.
-	ErrArgMissing = errors.New("cli: no args specified")
+	// ErrArgNone means no args.
+	ErrArgNone = errors.New("cli: no args specified")
 )

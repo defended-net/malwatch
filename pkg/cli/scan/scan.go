@@ -13,6 +13,8 @@ import (
 )
 
 // Do starts a scan.
+// ./malwatch scan
+// ./malwatch scan [PATH]
 func Do(env *env.Env, args []string) error {
 	switch {
 	case len(args) == 0:

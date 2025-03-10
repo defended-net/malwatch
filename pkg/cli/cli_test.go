@@ -6,138 +6,150 @@ package cli
 import (
 	"errors"
 	"flag"
+	"fmt"
 	"os"
-	"reflect"
-	"runtime"
-	"strings"
 	"testing"
 
-	"github.com/defended-net/malwatch/pkg/cli/act"
-	"github.com/defended-net/malwatch/pkg/cli/help"
-	"github.com/defended-net/malwatch/pkg/cli/info"
-	"github.com/defended-net/malwatch/pkg/cli/install"
+	"github.com/defended-net/malwatch/pkg/boot/env"
 )
+
+type input struct {
+	err error
+	fn  fn
+}
 
 type want struct {
 	err  error
-	fn   string
+	fn   fn
 	help error
 }
 
-func TestUnwrap(t *testing.T) {
+var mock = input{
+	err: fmt.Errorf("mock"),
+	fn:  fn(nil),
+}
+
+func Mock(min int, sub Sub) *Cmd {
+	return &Cmd{
+		Help: mock.err,
+		Min:  min,
+		Sub:  sub,
+		Fn:   mock.fn,
+	}
+}
+
+func TestRoute(t *testing.T) {
 	tests := map[string]struct {
-		input  []string
-		layout Layout
-		want   *want
+		input []string
+		sub   Sub
+		want  *want
 	}{
 		"none": {
 			input: []string{
 				"malwatch",
 			},
 
-			layout: map[string]*Cmd{},
+			sub: Sub{},
 
 			want: &want{
-				err: ErrArgMissing,
+				err: ErrArgNone,
 			},
 		},
 
 		"single": {
 			input: []string{
 				"malwatch",
-				"info",
+				"mock",
 			},
 
-			layout: map[string]*Cmd{
-				"info": {
-					Help: help.ErrInfo,
-					Fn:   info.Do,
+			sub: Sub{
+				"mock": {
+					Help: mock.err,
+					Fn:   mock.fn,
 				},
 			},
 
 			want: &want{
 				err:  nil,
-				fn:   "info.Do",
-				help: help.ErrInfo,
+				fn:   mock.fn,
+				help: mock.err,
 			},
 		},
 
 		"single-under": {
 			input: []string{
 				"malwatch",
-				"info",
+				"mock",
 			},
 
-			layout: map[string]*Cmd{
-				"info": {
-					Help: help.ErrInfo,
-					Min:  1,
-					Fn:   info.Do,
-				},
+			sub: Sub{
+				"mock": Mock(
+					1,
+
+					Sub{},
+				),
 			},
 
 			want: &want{
-				err:  help.ErrInfo,
-				fn:   "info.Do",
-				help: help.ErrInfo,
+				err:  mock.err,
+				fn:   mock.fn,
+				help: mock.err,
 			},
 		},
 
 		"nested": {
 			input: []string{
 				"malwatch",
-				"actions",
-				"get",
+				"mock-a",
+				"mock-b",
 			},
 
-			layout: Layout{
-				"actions": {
-					Help: help.ErrActs,
-					Min:  1,
+			sub: Sub{
+				"mock-a": Mock(
+					1,
 
-					Layout: Layout{
-						"get": {
-							Help: help.ErrActs,
+					Sub{
+						"mock-b": {
+							Help: mock.err,
 							Min:  0,
-							Fn:   act.Get,
+							Fn:   mock.fn,
 						},
 					},
-				},
+				),
 			},
 
 			want: &want{
 				err:  nil,
-				fn:   "act.Get",
-				help: help.ErrActs,
+				fn:   mock.fn,
+				help: mock.err,
 			},
 		},
 
 		"nested-under": {
 			input: []string{
 				"malwatch",
-				"actions",
-				"get",
+				"mock-a",
+				"mock-b",
 			},
 
-			layout: Layout{
-				"actions": {
-					Help: help.ErrActs,
-					Min:  1,
+			sub: Sub{
+				"mock-a": Mock(
+					1,
 
-					Layout: Layout{
-						"get": {
-							Help: help.ErrActs,
+					Sub{
+						"mock-b": {
+							Help: mock.err,
 							Min:  1,
-							Fn:   act.Get,
+							Fn:   mock.fn,
 						},
 					},
-				},
+				),
 			},
 
 			want: &want{
-				err:  help.ErrActs,
-				fn:   "act.Get",
-				help: help.ErrActs,
+				err:  mock.err,
+				fn:   mock.fn,
+				help: mock.err,
 			},
 		},
 	}
@@ -147,42 +159,39 @@ func TestUnwrap(t *testing.T) {
 			os.Args = test.input
 			flag.Parse()
 
-			result, err := test.layout.Unwrap()
+			result, err := test.sub.Route()
 			if !errors.Is(err, test.want.err) {
-				t.Errorf("unexpected unwrapped error: %v, want %v", err, test.want.err)
+				t.Errorf("unexpected route error: %v, want %v", err, test.want.err)
 			}
 
 			if result == nil {
 				return
 			}
 
-			fn := runtime.FuncForPC(reflect.ValueOf(result.Fn).Pointer()).Name()
-
-			if !strings.HasSuffix(fn, test.want.fn) {
-				t.Errorf("unexpected unwrapped fn result %v, want %v", fn, test.want)
+			if fmt.Sprintf("%v", result.Fn) != fmt.Sprintf("%v", test.want.fn) {
+				t.Errorf("unexpected route fn result %v, want %v", result.Fn, test.want.fn)
 			}
 
 			if !errors.Is(result.Help, test.want.help) {
-				t.Errorf("unexpected unwrapped help result %v, want %v", result.Help, test.want.help)
+				t.Errorf("unexpected route help result %v, want %v", result.Help, test.want.help)
 			}
 		})
 	}
 }
 
-func TestUnwrapErrs(t *testing.T) {
-	layout := Layout{
-		"actions": {
-			Help: help.ErrActs,
-			Min:  1,
+func TestRouteErrs(t *testing.T) {
+	sub := Sub{
+		"actions": Mock(
+			1,
 
-			Layout: Layout{
+			Sub{
 				"get": {
-					Help: help.ErrActs,
+					Help: mock.err,
 					Min:  1,
-					Fn:   act.Get,
+					Fn:   mock.fn,
 				},
 			},
-		},
+		),
 	}
 
 	os.Args = []string{
@@ -192,16 +201,19 @@ func TestUnwrapErrs(t *testing.T) {
 
 	flag.Parse()
 
-	if _, err := layout.Unwrap(); !errors.Is(err, ErrArgInvalid) {
-		t.Errorf("unexpected unwrapped error %v, want %v", err, ErrArgInvalid)
+	if _, err := sub.Route(); !errors.Is(err, ErrArgInvalid) {
+		t.Errorf("unexpected route error %v, want %v", err, ErrArgInvalid)
 	}
 }
 
 func TestRun(t *testing.T) {
-	input := Layout{
+	input := Sub{
 		"install": {
-			Help: help.ErrInstall,
-			Fn:   install.Do,
+			Help: mock.err,
+
+			Fn: func(*env.Env, []string) error {
+				return nil
+			},
 		},
 	}
 
@@ -218,13 +230,13 @@ func TestRun(t *testing.T) {
 }
 
 func TestPrint(t *testing.T) {
-	input := Layout{
+	input := Sub{
 		"1": &Cmd{
-			Help: errors.New("1-desc"),
+			Help: errors.New("desc-1"),
 		},
 
 		"2": &Cmd{
-			Help: errors.New("2-desc"),
+			Help: errors.New("desc-2"),
 		},
 	}
 

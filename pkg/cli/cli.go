@@ -13,24 +13,24 @@ import (
 	"github.com/defended-net/malwatch/pkg/cmd"
 )
 
-// Layout represents cmd layout.
-type Layout map[string]*Cmd
-
 // Cmd represents a cmd.
 type Cmd struct {
-	Help   error
-	Args   []string
-	Min    int
-	Pos    int
-	Layout Layout
-	Fn     CmdFn
+	Help error
+	Min  int
+	Sub  Sub
+	Fn   fn
+	args []string
+	pos  int
 }
 
-// CmdFn represents a cmd fn.
-type CmdFn func(*env.Env, []string) error
+// Sub represents subcmd layout.
+type Sub map[string]*Cmd
 
-// Run boots, locks and starts the cmd.
-func Run(layout Layout) (*cmd.State, error) {
+// fn represents a cmdfn.
+type fn func(*env.Env, []string) error
+
+// Run boots and then starts the cmdfn from given subcmd.
+func Run(sub Sub) (*cmd.State, error) {
 	state := cmd.NewState()
 
 	env, err := env.Load(state)
@@ -42,59 +42,67 @@ func Run(layout Layout) (*cmd.State, error) {
 		return env.State, err
 	}
 
-	cmd, err := layout.Unwrap()
+	cmd, err := sub.Route()
 	if err != nil {
 		return env.State, err
 	}
 
-	return env.State, cmd.Fn(env, cmd.Args)
+	return env.State, cmd.Fn(env, cmd.args)
 }
 
-// Unwrap unwraps layers to final cmd.
-func (layout Layout) Unwrap() (*Cmd, error) {
+// Route returns follow up cmd for given subcmd.
+func (sub Sub) Route() (*Cmd, error) {
 	args := flag.Args()
 
-	if len(args) == 0 {
-		layout.Print()
-		return nil, ErrArgMissing
+	cmd, err := base(sub, args)
+	if err != nil {
+		return nil, err
 	}
 
-	cmd := layout[args[0]]
-
-	switch {
-	case cmd == nil:
-		return cmd, fmt.Errorf("%w, %v", ErrArgInvalid, args[0])
-
-	case len(args) <= cmd.Min:
-		return nil, cmd.Help
-
-	default:
-		cmd.Args = args[1:]
-	}
-
-	for pos, arg := range cmd.Args {
-		next, ok := cmd.Layout[arg]
+	for pos, arg := range cmd.args {
+		next, ok := cmd.Sub[arg]
 		if !ok {
-			cmd.Pos = pos
-			cmd.Args = args[cmd.Pos+1:]
+			cmd.pos = pos
+			cmd.args = args[cmd.pos+1:]
 			break
 		}
 
 		cmd = next
 	}
 
-	if cmd.Layout != nil || len(cmd.Args) < cmd.Min {
+	if cmd.Sub != nil || len(cmd.args) < cmd.Min {
 		return nil, cmd.Help
 	}
 
 	return cmd, nil
 }
 
+// base returns the entry cmd.
+func base(sub Sub, args []string) (*Cmd, error) {
+	if len(args) == 0 {
+		sub.Print()
+		return nil, ErrArgNone
+	}
+
+	cmd := sub[args[0]]
+	if cmd == nil {
+		return nil, fmt.Errorf("%w, %v", ErrArgInvalid, args[0])
+	}
+
+	if len(args) <= cmd.Min {
+		return nil, cmd.Help
+	}
+
+	cmd.args = args[1:]
+
+	return cmd, nil
+}
+
 // Print prints logo and helps.
-func (layout Layout) Print() error {
+func (sub Sub) Print() error {
 	fmt.Print(help.Logo)
 
-	for arg, cmd := range layout {
+	for arg, cmd := range sub {
 		fmt.Print("\n", arg, "\n")
 		fmt.Print(cmd.Help, "\n")
 	}

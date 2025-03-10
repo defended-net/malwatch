@@ -72,7 +72,7 @@ func (acter *Alerter) Load() error {
 func (acter *Alerter) Act(result *state.Result) error {
 	for _, alerter := range acter.senders {
 		if err := alerter.Alert(result); err != nil {
-			result.Errs.Add(err)
+			result.AddErr(err)
 		}
 	}
 

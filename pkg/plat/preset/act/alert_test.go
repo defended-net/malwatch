@@ -11,7 +11,6 @@ import (
 	"testing"
 
 	"github.com/defended-net/malwatch/pkg/boot/env"
-	"github.com/defended-net/malwatch/pkg/db/orm/hit"
 	"github.com/defended-net/malwatch/pkg/scan/state"
 )
 
@@ -31,34 +30,27 @@ func TestActAlert(t *testing.T) {
 		want  error
 	}{
 		"single": {
-			input: &state.Result{
-				Paths: map[string]*hit.Meta{
+			input: state.NewResult("",
+				state.Paths{
 					t.Name(): {},
-				},
-
-				Errs: &state.Errs{},
-			},
+				}),
 
 			want: nil,
 		},
 
 		"multi": {
-			input: &state.Result{
-				Paths: map[string]*hit.Meta{
+			input: state.NewResult("",
+				state.Paths{
 					t.Name():        {},
 					t.Name() + "-b": {},
-				},
-
-				Errs: &state.Errs{},
-			},
+				}),
 
 			want: nil,
 		},
 
 		"none": {
-			input: &state.Result{
-				Errs: &state.Errs{},
-			},
+			input: state.NewResult("",
+				state.Paths{}),
 
 			want: nil,
 		},

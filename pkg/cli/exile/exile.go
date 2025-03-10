@@ -5,6 +5,7 @@ package exile
 
 import (
 	"fmt"
+	"log/slog"
 	"path/filepath"
 
 	"golang.org/x/sys/unix"
@@ -33,20 +34,20 @@ func Do(env *env.Env, args []string) error {
 		return err
 	}
 
-	result := &state.Result{
-		Target: re.Target(path),
-		Paths: state.Paths{
+	var (
+		paths = state.Paths{
 			path: hit.NewMeta(fsys.NewAttr(stat), []string{}, "exile"),
-		},
-	}
+		}
 
-	acter, err := acter.Get(env.Plat.Acters(), "exile")
-	if err != nil {
+		result = state.NewResult(re.Target(path), paths)
+	)
+
+	if err := acter.Do(env.Plat.Acters(), "exile", result); err != nil {
 		return err
 	}
 
-	if err := acter.Act(result); err != nil {
-		return err
+	for _, err := range result.Errs() {
+		slog.Error(err.Error())
 	}
 
 	return result.Save(env.Db)

@@ -131,11 +131,16 @@ eval(gzinflate(base64_decode('test')));
 		t.Fatalf("stat error: %v", err)
 	}
 
-	input := &state.Result{
-		Paths: map[string]*hit.Meta{
-			path: hit.NewMeta(fsys.NewAttr(stat), []string{"gz"}, "clean"),
-		},
-	}
+	input := state.NewResult("",
+		state.Paths{
+			path: hit.NewMeta(
+				fsys.NewAttr(stat),
+
+				[]string{"gz"},
+
+				"clean",
+			),
+		})
 
 	if err := cleaner.Act(input); err != nil {
 		t.Errorf("clean act error: %v", err)

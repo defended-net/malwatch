@@ -10,19 +10,20 @@ import (
 	"testing"
 
 	"github.com/defended-net/malwatch/pkg/boot/env"
-	"github.com/defended-net/malwatch/pkg/db/orm/hit"
 	"github.com/defended-net/malwatch/pkg/scan/state"
 )
 
 var (
-	hits = &state.Result{
-		Paths: map[string]*hit.Meta{
+	hits = state.NewResult(
+		"",
+
+		state.Paths{
 			"/target/test.php": {
 				Rules:  []string{"eicar"},
 				Status: "/quarantine/test.php-1",
 			},
 		},
-	}
+	)
 )
 
 func TestMain(m *testing.M) {

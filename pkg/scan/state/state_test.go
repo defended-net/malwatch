@@ -13,15 +13,15 @@ import (
 	"github.com/defended-net/malwatch/pkg/db/orm/hit"
 )
 
-func TestNew(t *testing.T) {
+func TestNewJob(t *testing.T) {
 	var (
 		want = &Job{
 			WGrp: &sync.WaitGroup{},
 			Hits: make(chan *Hit),
-			Errs: &Errs{},
+			errs: &Errs{},
 		}
 
-		got = New()
+		got = NewJob()
 	)
 
 	got.Hits = want.Hits
@@ -35,19 +35,22 @@ func TestGroup(t *testing.T) {
 	var (
 		dir = t.TempDir()
 
-		want = []*Result{
-			{
-				Target: "target",
+		got = Group("fs",
+			[]*Hit{
+				{
+					Path: dir,
+					Meta: &hit.Meta{},
+				},
+			},
+		)
 
-				Paths: Paths{
+		want = []*Result{
+			NewResult("fs",
+				Paths{
 					dir: &hit.Meta{},
 				},
-
-				Errs: &Errs{},
-			},
+			),
 		}
-
-		got = Group("target", []*Hit{{Path: dir, Meta: &hit.Meta{}}}, &Errs{})
 	)
 
 	if !reflect.DeepEqual(got, want) {
@@ -66,7 +69,7 @@ func TestGroupEmpty(t *testing.T) {
 			},
 		}
 
-		got = Group("", hits, &Errs{})
+		got = Group("", hits)
 	)
 
 	if got[0].Target == "" {
@@ -87,7 +90,7 @@ func TestGroupDupes(t *testing.T) {
 
 		want = []*Result{
 			{
-				Target: "target",
+				Target: "fs",
 
 				Paths: Paths{
 					dir: &hit.Meta{
@@ -99,7 +102,7 @@ func TestGroupDupes(t *testing.T) {
 					},
 				},
 
-				Errs: &Errs{},
+				errs: &Errs{},
 			},
 		}
 
@@ -111,6 +114,7 @@ func TestGroupDupes(t *testing.T) {
 
 			{
 				Path: dir,
+
 				Meta: &hit.Meta{
 					Rules: []string{
 						"rule-three",
@@ -119,7 +123,7 @@ func TestGroupDupes(t *testing.T) {
 			},
 		}
 
-		got = Group("fs", hits, &Errs{})
+		got = Group("fs", hits)
 	)
 
 	if !slices.Equal(got[0].Paths[dir].Rules, want[0].Paths[dir].Rules) {
@@ -129,19 +133,18 @@ func TestGroupDupes(t *testing.T) {
 
 func TestGroupCompound(t *testing.T) {
 	var (
-		dir1 = t.TempDir()
-		dir2 = t.TempDir()
+		dir1, dir2 = t.TempDir(), t.TempDir()
 
 		want = []*Result{
 			{
-				Target: "target",
+				Target: "fs",
 
 				Paths: Paths{
 					dir1: &hit.Meta{},
 					dir2: &hit.Meta{},
 				},
 
-				Errs: &Errs{},
+				errs: &Errs{},
 			},
 		}
 
@@ -157,7 +160,7 @@ func TestGroupCompound(t *testing.T) {
 			},
 		}
 
-		got = Group("target", hits, &Errs{})
+		got = Group("fs", hits)
 	)
 
 	if !reflect.DeepEqual(got, want) {
@@ -174,7 +177,7 @@ func TestAddErr(t *testing.T) {
 	}{
 		"new": {
 			job: &Job{
-				Errs: &Errs{},
+				errs: &Errs{},
 			},
 
 			input: []error{
@@ -188,7 +191,7 @@ func TestAddErr(t *testing.T) {
 
 		"append": {
 			job: &Job{
-				Errs: &Errs{
+				errs: &Errs{
 					Vals: []error{
 						io.EOF,
 					},
@@ -212,7 +215,7 @@ func TestAddErr(t *testing.T) {
 				test.job.AddErr(err)
 			}
 
-			got := test.job.GetErrs()
+			got := test.job.Errs()
 
 			if !slices.Equal(got, test.want) {
 				t.Errorf("unexpected get errs result %v, want %v", got, test.want)

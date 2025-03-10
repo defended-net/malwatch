@@ -15,6 +15,7 @@ import (
 )
 
 // Do restores.
+// ./malwatch restore [PATH]
 func Do(env *env.Env, args []string) error {
 	path := args[0]
 

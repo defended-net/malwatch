@@ -9,6 +9,7 @@ import (
 )
 
 // Do helps avoid error alarms by creating a clean 0 exit status code for initial run.
+// ./malwatch install
 func Do(env *env.Env, args []string) error {
 	if len(args) == 0 {
 		return nil

@@ -32,13 +32,13 @@ There is tremendous value if malwatch is elected to replace your fleet's existin
 - Structured logs entirely formatted as JSON.
 - ACID compliant database for record keeping.
 
-# Installation
+# Getting Started
 
 Create a directory anywhere you prefer, software is meant to be portable. A common choice is `/opt/malwatch`. Then extract the binary there from the downloaded archive:
 
-    wget https://github.com/defended-net/malwatch/releases/download/v1.0.0/malwatch_1.0.0_linux_amd64.tar.gz
+    wget https://github.com/defended-net/malwatch/releases/download/v1.0.2/malwatch_1.0.2_linux_amd64.tar.gz
     mkdir /opt/malwatch
-    tar -C /opt/malwatch -xzvf malwatch_1.0.0_linux_amd64.tar.gz
+    tar -C /opt/malwatch -xzvf malwatch_1.0.2_linux_amd64.tar.gz
 
 It would be recommended to set up your `PATH`:
 
@@ -66,49 +66,15 @@ Using `systemd`, it is necessary to enable followed by starting it:
     systemctl enable malwatch-monitor
     systemctl start malwatch-monitor
 
-## Cron
+# Configuration
 
-`cron` can be used to schedule scans at preferred intervals. It is not recommended to use scheduled scans if real time scanning with `malwatch-monitor` is already being used.
+Some basic config variables are needed for operation and are defined in the file `cfg/cfg.toml`. We should start with `targets`. The term `target` means a group of paths which share a common parent. This is accomplished using regex. 
 
-The command `crontab -e` is used to add or modify cron jobs. The command field can specify the absolute path `/opt/malwatch/malwatch scan` to automatically scan all targets. An example configuration to scan each day at 01:00 AM is as follows:
-
-    0 1 * * * /opt/malwatch/malwatch scan
-
-# Setup
-
-Some basic config variables are needed for basic operation and must be defined in the file `cfg/cfg.toml`.
+The use of `(?P<target>.*)` is a **capture group**. Any paths under the directory `/var/www` will be considered the `target`. The default `Paths` config variable is `/var/www/html`, which means any detections will be associated as target `html`.
 
 Once configured, you are ready to perform your first scan!
 
     malwatch scan /var/www/html
-
-# Targets
-
-The term `target` means a group of paths which share a common parent. This is accomplished using regex. The default value is `Targets = ["^/var/www/(?P<target>[^/]+)"]`
-
-In the cfg file `(?P<target>.*)` is a **capture group**. Any paths under the directory `/var/www` will be considered the `target`. The default `Paths` config variable is `/var/www/html`, which means any detections will be associated as target `html`.
-
-We could then scan a path `/var/www/images` but any detections there would then be assigned the target `images`.
-
-A scan of path `/var/static` does not match with the regex and thus is assigned the target `fs`, which is the *catchall* target for all detections which do not match the `Targets` regex.
-
-Targets are essential to grouping detections, especially when sending alerts and saving detections to the database.
-
-Let's now go over the other config variables to better understand their role.
-
-Variable  | Description
-------------- | -------------
-Identifier  | Custom identifier, useful for alerts and logging. Defaults to system hostname.
-Cores  | Limit execution based on processor core count. `0` disables limit.
-Threads  | Limit execution based on thread count. `0` disables limit.
-Timeout  | Time limit (min) of scans _per target_. `0` disables limit.
-Monitor.Timeout  | Interval (sec) for real time monitoring scans to scan the queue.
-Targets  | Regex to determine a path's `target` classification.
-Paths  | List of paths to scan. Multiple entries is possible `["/path/a", "/path/b"]`
-MaxAge  | Maximum age of files to scan (days).
-BlkSz  | Chunk size (KiB) per read of each file.
-BatchSz  | Maximum number of detections per alert before sending the next alert.
-Verbose  | Enables extra trace information in logs.
 
 # Actions
 
@@ -128,6 +94,15 @@ Verb  | Outcome
 `quarantine` | Move detection to a the quarantine path (defined in `cfg/cfg.toml`).
 `exile` | Uploads detection to your `s3` bucket. File is removed after succcessful upload, unless `quarantine` is included as the actions.
 `clean` | Sed based expressions which remove malware automatically. Basic `base64` encoded malware removal expressions are included.
+
+## Crons
+
+`cron` can be used to schedule scans at preferred intervals. It is not recommended to use scheduled scans if real time scanning with `malwatch-monitor` is already being used.
+
+The command `crontab -e` is used to add or modify cron jobs. The command field can specify the absolute path `/opt/malwatch/malwatch scan` to automatically scan all targets. An example configuration to update signatures at midnight followed by a scan at the following hour is as follows:
+
+    0 0 * * * /opt/malwatch/malwatch signatures update
+    0 1 * * * /opt/malwatch/malwatch scan
 
 # Platform Integrations
 

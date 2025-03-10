@@ -88,11 +88,17 @@ func TestQuarantine(t *testing.T) {
 		t.Fatalf("stat error: %v", err)
 	}
 
-	hit := &state.Result{
-		Paths: map[string]*hit.Meta{
-			file.Name(): hit.NewMeta(fsys.NewAttr(stat), []string{t.Name()}, "quarantine"),
-		},
-	}
+	hit := state.NewResult("",
+		state.Paths{
+			file.Name(): hit.NewMeta(
+				fsys.NewAttr(stat),
+
+				[]string{
+					t.Name(),
+				},
+
+				"quarantine"),
+		})
 
 	quarantiner := Quarantiner{
 		dir: env.Cfg.Acts.Quarantine.Dir,
@@ -119,12 +125,12 @@ func TestQuarantineErrs(t *testing.T) {
 	}{
 		"fs-err": {
 			input: "/dev/null/err",
-			want:  fsys.ErrFileOpen,
+			want:  ErrQuarantineMv,
 		},
 
 		"relative": {
 			input: "dev/null/err",
-			want:  fsys.ErrPathNotAbs,
+			want:  ErrQuarantineMv,
 		},
 	}
 
@@ -140,18 +146,21 @@ func TestQuarantineErrs(t *testing.T) {
 				},
 			}
 
-			result := &state.Result{
-				Paths: map[string]*hit.Meta{
+			result := state.NewResult("",
+				state.Paths{
 					test.input: meta,
-				},
-
-				Errs: &state.Errs{},
-			}
+				})
 
 			quarantiner := Quarantiner{dir: env.Cfg.Acts.Quarantine.Dir}
 
-			if err := quarantiner.Act(result); !errors.Is(result.Errs.Get()[0], test.want) {
-				t.Errorf("unexpected quarantine error %v, want %v", err, test.want)
+			if err := quarantiner.Act(result); err != nil {
+				t.Fatalf("quarantine error %v", err)
+			}
+
+			errs := result.Errs()
+
+			if !errors.Is(errs[0], test.want) {
+				t.Errorf("unexpected quarantine error %v, want %v", errs[0], test.want)
 			}
 		})
 	}

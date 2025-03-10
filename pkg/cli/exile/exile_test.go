@@ -5,6 +5,7 @@ package exile
 
 import (
 	"errors"
+	"io/fs"
 	"os"
 	"path/filepath"
 	"testing"
@@ -42,7 +43,7 @@ func TestDo(t *testing.T) {
 	}
 }
 
-func TestDoErrs(t *testing.T) {
+func TestDoInvalidPath(t *testing.T) {
 	tests := map[string]struct {
 		input []string
 		want  error
@@ -101,5 +102,21 @@ func TestDoErrs(t *testing.T) {
 				t.Errorf("unexpected exile result %v, want %v", err, test.want)
 			}
 		})
+	}
+}
+
+func TestDoErrs(t *testing.T) {
+	var (
+		input = []string{filepath.Join(t.TempDir(), t.Name())}
+		want  = fs.ErrNotExist
+	)
+
+	env, err := env.Mock(t.Name(), t.TempDir())
+	if err != nil {
+		t.Errorf("env mock error: %v", err)
+	}
+
+	if err := Do(env, input); !errors.Is(err, want) {
+		t.Errorf("unexpected quarantine err %v, want %v", err, want)
 	}
 }

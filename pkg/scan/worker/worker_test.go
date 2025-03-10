@@ -54,7 +54,7 @@ func TestWork(t *testing.T) {
 		queue <- filepath.Join(t.TempDir(), t.Name())
 	}()
 
-	state := state.New()
+	state := state.NewJob()
 
 	state.WGrp.Add(1)
 
@@ -81,7 +81,7 @@ func TestScan(t *testing.T) {
 		t.Errorf("file write error: %v", err)
 	}
 
-	state := state.New()
+	state := state.NewJob()
 
 	go func(worker *Worker) {
 		defer close(state.Hits)
