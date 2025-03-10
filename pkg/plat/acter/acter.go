@@ -3,7 +3,9 @@
 
 package acter
 
-import "github.com/defended-net/malwatch/pkg/scan/state"
+import (
+	"github.com/defended-net/malwatch/pkg/scan/state"
+)
 
 // Acter represents an acter.
 type Acter interface {
@@ -21,4 +23,14 @@ func Get(acts []Acter, verb string) (Acter, error) {
 	}
 
 	return nil, ErrVerbUnknown
+}
+
+// Do gets the actfn from given acters and verb for invocation.
+func Do(acters []Acter, verb string, result *state.Result) error {
+	acter, err := Get(acters, verb)
+	if err != nil {
+		return err
+	}
+
+	return acter.Act(result)
 }

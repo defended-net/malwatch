@@ -79,15 +79,18 @@ func TestAct(t *testing.T) {
 		t.Fatalf("stat error: %v", err)
 	}
 
-	result := &state.Result{
-		Paths: map[string]*hit.Meta{
+	result := state.NewResult("",
+		state.Paths{
 			file.Name(): hit.NewMeta(
 				fsys.NewAttr(stat),
-				[]string{t.Name()},
+
+				[]string{
+					t.Name(),
+				},
+
 				"exile",
 			),
-		},
-	}
+		})
 
 	transport, err := s3.New(env.Cfg.Secrets.S3)
 	if err != nil {
@@ -126,15 +129,24 @@ func TestActRemoved(t *testing.T) {
 		t.Fatalf("stat error: %v", err)
 	}
 
-	hit := &state.Result{
-		Paths: map[string]*hit.Meta{
+	hit := state.NewResult(
+		"",
+
+		state.Paths{
 			file.Name(): hit.NewMeta(
 				fsys.NewAttr(stat),
-				[]string{t.Name()},
-				[]string{"exile", "quarantine"}...,
+
+				[]string{
+					t.Name(),
+				},
+
+				[]string{
+					"exile",
+					"quarantine",
+				}...,
 			),
 		},
-	}
+	)
 
 	exiler := Exiler{secrets: env.Cfg.Secrets.S3}
 

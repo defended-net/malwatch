@@ -9,6 +9,7 @@ import (
 )
 
 // Do starts a file monitor.
+// ./malwatch monitor start
 func Do(env *env.Env, _ []string) error {
 	return monitor.Run(env)
 }

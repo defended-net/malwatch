@@ -15,10 +15,10 @@ var (
 
 // ALERTS
 var (
-	// ErrAlerterLoad means alerter load error.
+	// ErrAlerterLoad means alerter load err.
 	ErrAlerterLoad = errors.New("act: alerter load error")
 
-	// ErrAlertSend means alerter load error.
+	// ErrAlertSend means alert send err.
 	ErrAlertSend = errors.New("act: alert send error")
 )
 
@@ -26,6 +26,9 @@ var (
 var (
 	// ErrQuarantineNoDir means no quarantine dir.
 	ErrQuarantineNoDir = errors.New("act: no quarantine dir configured in cfg/actions.toml")
+
+	// ErrQuarantineMv means hit mv err.
+	ErrQuarantineMv = errors.New("act: move hit error")
 )
 
 // CLEANS
@@ -42,6 +45,9 @@ var (
 	// ErrExileNoRegion means no region configured.
 	ErrExileNoRegion = errors.New("act: no region configured for exile")
 
-	// ErrExileUpload means upload error.
+	// ErrExileUpload means upload err.
 	ErrExileUpload = errors.New("act: exile upload error")
+
+	// ErrExileDelErr means del err.
+	ErrExileDelErr = errors.New("act: exile del error")
 )

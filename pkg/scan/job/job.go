@@ -45,7 +45,7 @@ type Paths struct {
 func New(target string, paths *Paths, timeout time.Duration, batchSz int, acters []acter.Acter, tasks []func(*state.Result) error, ticker bool) *Job {
 	job := &Job{
 		Target:  target,
-		State:   state.New(),
+		State:   state.NewJob(),
 		timeout: timeout,
 		batchSz: batchSz,
 		paths:   paths,
@@ -126,7 +126,7 @@ func (job *Job) Stop() {
 		hits = append(hits, hit)
 
 		if idx > job.batchSz {
-			grouped := state.Group(job.Target, hits, job.State.Errs)
+			grouped := state.Group(job.Target, hits)
 
 			for _, result := range grouped {
 				job.Acts(result)
@@ -138,14 +138,14 @@ func (job *Job) Stop() {
 		}
 	}
 
-	grouped := state.Group(job.Target, hits, job.State.Errs)
+	grouped := state.Group(job.Target, hits)
 
 	for _, result := range grouped {
 		job.Acts(result)
 		job.Tasks(result)
 	}
 
-	for _, err := range job.State.GetErrs() {
+	for _, err := range job.State.Errs() {
 		slog.Error(err.Error())
 	}
 }
@@ -160,7 +160,7 @@ func (job *Job) Acts(result *state.Result) {
 		}
 
 		if err := acter.Act(filtered); err != nil {
-			result.Errs.Add(err)
+			result.AddErr(err)
 		}
 	}
 }
@@ -169,18 +169,14 @@ func (job *Job) Acts(result *state.Result) {
 func (job *Job) Tasks(result *state.Result) {
 	for _, task := range job.tasks {
 		if err := task(result); err != nil {
-			result.Errs.Add(err)
+			result.AddErr(err)
 		}
 	}
 }
 
 // FilterAct returns grouped hits from given act verb.
 func FilterAct(result *state.Result, verb string) *state.Result {
-	filtered := &state.Result{
-		Target: result.Target,
-		Paths:  state.Paths{},
-		Errs:   result.Errs,
-	}
+	filtered := state.NewResult(result.Target, state.Paths{})
 
 	for path, meta := range result.Paths {
 		if slices.Contains(meta.Acts, verb) {

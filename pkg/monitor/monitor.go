@@ -127,7 +127,7 @@ func Run(env *env.Env) error {
 				continue
 			}
 
-			grouped = state.Group("", hits, monitor.job.State.Errs)
+			grouped = state.Group("", hits)
 
 			for _, result := range grouped {
 				monitor.job.Acts(result)

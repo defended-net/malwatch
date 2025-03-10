@@ -8,7 +8,6 @@ import (
 	"testing"
 
 	"github.com/defended-net/malwatch/pkg/db/orm"
-	"github.com/defended-net/malwatch/pkg/db/orm/hit"
 )
 
 func TestPrint(t *testing.T) {
@@ -17,35 +16,35 @@ func TestPrint(t *testing.T) {
 		want  []error
 	}{
 		"single": {
-			input: &Result{
-				Target: "target",
+			input: NewResult(
+				"fs",
 
-				Paths: map[string]*hit.Meta{
-					"/target/index.php": {
+				Paths{
+					"/fs/index.php": {
 						Rules: []string{"rule"},
 					},
 				},
-			},
+			),
 		},
 
 		"compound": {
-			input: &Result{
-				Target: "target",
+			input: NewResult(
+				"fs",
 
-				Paths: map[string]*hit.Meta{
-					"/target/index.php": {
+				Paths{
+					"/fs/index.php": {
 						Rules: []string{"rule"},
 					},
 
-					"/target/index-b.php": {
+					"/fs/index-b.php": {
 						Rules: []string{"rule-b"},
 					},
 
-					"/target/index-c.php": {
+					"/fs/index-c.php": {
 						Rules: []string{"rule-c"},
 					},
 				},
-			},
+			),
 		},
 	}
 
@@ -64,39 +63,35 @@ func TestSave(t *testing.T) {
 		want  []error
 	}{
 		"single": {
-			input: &Result{
-				Target: "target",
+			input: NewResult(
+				"fs",
 
-				Paths: map[string]*hit.Meta{
-					"/target/index.php": {
+				Paths{
+					"/fs/index.php": {
 						Rules: []string{"rule"},
 					},
 				},
-
-				Errs: &Errs{},
-			},
+			),
 		},
 
 		"compound": {
-			input: &Result{
-				Target: "target",
+			input: NewResult(
+				"fs",
 
-				Paths: map[string]*hit.Meta{
-					"/target/index.php": {
+				Paths{
+					"/fs/index.php": {
 						Rules: []string{"rule"},
 					},
 
-					"/target/index-b.php": {
+					"/fs/index-b.php": {
 						Rules: []string{"rule-b"},
 					},
 
-					"/target/index-c.php": {
+					"/fs/index-c.php": {
 						Rules: []string{"rule-c"},
 					},
 				},
-
-				Errs: &Errs{},
-			},
+			),
 		},
 	}
 
