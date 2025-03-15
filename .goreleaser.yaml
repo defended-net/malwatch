@@ -33,13 +33,13 @@ archives:
 changelog:
   sort: asc
   groups:
-    - title: "Security Fixes"
+    - title: "Sec"
       regexp: '^.*?sec(\(.+\))??!?:.+$'
       order: 100
-    - title: "New Features"
+    - title: "Features"
       regexp: '^.*?feat(\(.+\))??!?:.+$'
       order: 200
-    - title: "Bug Fixes"
+    - title: "Fixes"
       regexp: '^.*?fix(\(.+\))??!?:.+$'
       order: 300
     - title: "Refactors"
