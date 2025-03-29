@@ -8,15 +8,13 @@
 
 ![GitHub License](https://img.shields.io/github/license/defended-net/malwatch) [![Go Report Card](https://goreportcard.com/badge/github.com/defended-net/malwatch)](https://goreportcard.com/report/github.com/defended-net/malwatch)
 
-Malwatch is a fast and lightweight malware scanner written in `go` that is ideal for Linux based web server environments. It is capable of scaling to any requirements and is currently used with some of the internet's largest deployments.
+Malwatch is a fast and lightweight malware scanner written in `go` for Linux based web server environments. It is capable of scaling to any requirements and is in production with some of the internet's largest deployments.
 
-Besides excellent detection rates, key design considerations are low resource usage and high performance. A powerful and easy to understand api is provided to cover your alerting requirements and platform integration.
-
-The web hosting industry is in need for a modern open source solution that is done properly. Our objective is to offer a comparably better solution to commercial products, thereby empowering everyone to have good malware protection.
+Besides excellent detection rates, key design considerations are low resource usage while delivering leading performance. A powerful and easy to understand API is provided to cover your alerting requirements and platform integration.
 
 Real time monitoring is offered by `malwatch-monitor`. The number of files present on the system or volume being created / changed does not influence startup time, memory or cpu usage because a queue design ensures there would always be the same resource usage as an equivalent ondemand file scan. The result is an extremely efficient monitoring presence which would otherwise be impractical due to resource usage.
 
-A complete malware signature set is included with updates provided by our [signature repo](https://github.com/defended-net/malwatch-signatures).
+A complete malware signature set is included with seamless updates provided by our [signature repo](https://github.com/defended-net/malwatch-signatures).
 
 There is tremendous value if malwatch is elected to replace your fleet's existing commercial solution. Please consider sponsoring to help us maintain this and other projects.
 
@@ -25,6 +23,7 @@ There is tremendous value if malwatch is elected to replace your fleet's existin
 - On Demand and Real Time scans.
 - Leading performance with resource usage profile delivered in ~22 MiB memory alongside low cpu footprint even under full load.
 - Comprehensive malware signature set.
+- Submit feature to upload new malware samples.
 - Simple yet powerful API to integrate with your backend and platform. Ideal to improve threat intelligence.
 - Flexible alerting capability with built-in support for PagerDuty, e - mail and custom JSON. Use the API to easily add your own!
 - Complete control over the outcome of malware with the help of `actions`. We include `alert`, `quarantine`, `clean` and `exile` but custom ones can be defined.
@@ -36,15 +35,11 @@ There is tremendous value if malwatch is elected to replace your fleet's existin
 
 Create a directory anywhere you prefer, software is meant to be portable. A common choice is `/opt/malwatch`. Then extract the binary there from the downloaded archive:
 
-    wget https://github.com/defended-net/malwatch/releases/download/v1.0.3/malwatch_1.0.3_linux_amd64.tar.gz
+    wget https://github.com/defended-net/malwatch/releases/download/v1.1.0/malwatch_1.1.0_linux_amd64.tar.gz
     mkdir /opt/malwatch
-    tar -C /opt/malwatch -xzvf malwatch_1.0.3_linux_amd64.tar.gz
+    tar -C /opt/malwatch -xzvf malwatch_1.1.0_linux_amd64.tar.gz
 
-It would be recommended to set up your `PATH`:
-
-    export PATH=$PATH:/opt/malwatch
-
-Alternatively symlinks could be used:
+It would be recommended to integrate it with your `PATH`:
 
     ln -s /opt/malwatch/malwatch /usr/local/bin/malwatch
     ln -s /opt/malwatch/malwatch-monitor /usr/local/bin/malwatch-monitor
@@ -57,15 +52,6 @@ If you are using automation (such as Ansible) and want a clean exit, then `malwa
 
 Optional config files have the `.disabled` file extension. These can be renamed to `.toml` to enable.
 
-## Real Time Scanning
-
-Real time malware scanning is possible with `malwatch-monitor`. A `systemd` unit can automatically be created with `malwatch install systemd`. This is optional - feel free to set up your own or use any preferred setup such as a foreground process or even `screen`. We believe software should be flexible.
-
-Using `systemd`, it is necessary to enable followed by starting it:
-
-    systemctl enable malwatch-monitor
-    systemctl start malwatch-monitor
-
 # Configuration
 
 Some basic config variables are needed for operation and are defined in the file `cfg/cfg.toml`. We should start with `targets`. The term `target` means a group of paths which share a common parent. This is accomplished using regex. 
@@ -76,26 +62,7 @@ Once configured, you are ready to perform your first scan!
 
     malwatch scan /var/www/html
 
-# Actions
-
-Actions are configured in the file `cfg/actions.toml`
-
-An outcome which occurs as a result from a detection is an `action`. Actions are so powerful because they can easily be customised at a granular level. Custom actions can even be created
-
-Each `action` comprises of a `verb` paired with `acter`. Each detection can have multiple `actions`. The lack of any `verb` for a detection means no actions will occur, this can be considered the same as a traditional "whitelist".
-
-The following verbs are bundled with malwatch:
-
-# Verbs
-
-Verb  | Outcome
-------------- | -------------
-`alert` | Notification by means of one or more alerters. We bundle PagerDuty, e - mail and custom JSON.
-`quarantine` | Move detection to a the quarantine path (defined in `cfg/cfg.toml`).
-`exile` | Uploads detection to your `s3` bucket. File is removed after succcessful upload, unless `quarantine` is included as the actions.
-`clean` | Sed based expressions which remove malware automatically. Basic `base64` encoded malware removal expressions are included.
-
-## Crons
+## Scheduling Scans
 
 `cron` can be used to schedule scans at preferred intervals. It is not recommended to use scheduled scans if real time scanning with `malwatch-monitor` is already being used.
 
@@ -104,7 +71,22 @@ The command `crontab -e` is used to add or modify cron jobs. The command field c
     0 0 * * * /opt/malwatch/malwatch signatures update
     0 1 * * * /opt/malwatch/malwatch scan
 
+## Real Time Scanning
+
+Real time malware scanning is possible with `malwatch-monitor`. A `systemd` unit can automatically be created with `malwatch install systemd`. This is optional - feel free to set up your own or use any preferred method such as a foreground process or even `screen`. We believe software should be flexible.
+
+Using `systemd`, it is necessary to `enable` followed by `start`:
+
+    systemctl enable malwatch-monitor
+    systemctl start malwatch-monitor
+
+# Submit Malware Samples
+
+Our API can receive malware samples to improve the signature base. One upload is permitted per week and additional uploads are included for our [Sponsors](https://defended.net/sponsor)
+
 # Platform Integrations
+
+Malwatch can operate as standalone or easily be compatible with any setup.
 
 - cPanel
 
@@ -112,7 +94,7 @@ cPanel is included as a drop - in platform integration. It can be enabled by ren
 
 # Documentation
 
-Quick Start guide, advanced usage, changelog and other resources for both users and developers are available at our [Documentation](https://docs.defended.net/malwatch)
+Advanced usage, changelog and other information for users and developers is available at our [Documentation](https://docs.defended.net/malwatch)
 
 # Community
 
