@@ -19,6 +19,7 @@ import (
 type Cfg struct {
 	path   string
 	Alerts *Alerts
+	Submit *Submit
 	S3     *S3
 	Git    []*Repo
 }
@@ -58,11 +59,17 @@ type S3 struct {
 	Secret   string `env:"S3_SECRET"`
 }
 
-// Repo represents a git repo.
+// Repo represents git repo.
 type Repo struct {
 	User  string
 	Token string
 	URL   string
+}
+
+// Submit represents sample submissions.
+type Submit struct {
+	Endpoint string `env:"SUBMIT_ENDPOINT"`
+	Key      string `env:"SUBMIT_KEY"`
 }
 
 // New returns a new cfg.
@@ -75,6 +82,8 @@ func New(path string) *Cfg {
 			PagerDuty: &PagerDuty{},
 			SMTP:      &SMTP{},
 		},
+
+		Submit: &Submit{},
 
 		S3: &S3{},
 	}
@@ -112,6 +121,11 @@ func Mock(path string) (*Cfg, error) {
 			JSON:      &JSON{},
 			PagerDuty: &PagerDuty{},
 			SMTP:      &SMTP{},
+		},
+
+		Submit: &Submit{
+			Endpoint: "https://api.defended.net/malwatch/submit",
+			Key:      "",
 		},
 
 		S3: &S3{},

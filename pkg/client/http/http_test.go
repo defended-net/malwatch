@@ -4,13 +4,12 @@
 package http
 
 import (
+	"bytes"
 	"errors"
 	"net/http"
 	"net/http/httptest"
 	"testing"
 	"time"
-
-	"github.com/defended-net/malwatch/pkg/boot/env/cfg/secret"
 )
 
 var client = &http.Client{
@@ -21,7 +20,7 @@ func TestPost(t *testing.T) {
 	svc := httptest.NewServer(http.HandlerFunc(func(_ http.ResponseWriter, _ *http.Request) {}))
 	defer svc.Close()
 
-	if err := Post(client, nil, nil, svc.URL, []byte(t.Name()), []int{200}); err != nil {
+	if err := Post(client, nil, nil, svc.URL, bytes.NewReader([]byte(t.Name())), 200); err != nil {
 		t.Errorf("post error: %s", err)
 	}
 }
@@ -30,13 +29,13 @@ func TestPostRespCodes(t *testing.T) {
 	svc := httptest.NewServer(http.HandlerFunc(func(_ http.ResponseWriter, _ *http.Request) {}))
 	defer svc.Close()
 
-	if err := Post(client, nil, nil, svc.URL, []byte(t.Name()), []int{404}); !errors.Is(err, ErrBadStatus) {
+	if err := Post(client, nil, nil, svc.URL, bytes.NewReader([]byte(t.Name())), 404); !errors.Is(err, ErrBadStatus) {
 		t.Errorf("unexpected post resp code error: %v, want %v", err, ErrBadStatus)
 	}
 }
 
 func TestPostErrs(t *testing.T) {
-	if err := Post(client, nil, nil, "https://"+t.Name(), []byte(t.Name()), []int{200}); !errors.Is(err, ErrReqDo) {
+	if err := Post(client, nil, nil, "https://"+t.Name(), bytes.NewReader([]byte(t.Name())), 200); !errors.Is(err, ErrReqDo) {
 		t.Errorf("unexpected post error: %v, want %v", err, ErrReqDo)
 	}
 }
@@ -52,7 +51,7 @@ func TestPostWithHeaders(t *testing.T) {
 	headers := http.Header{}
 	headers.Set("Content-Type", "application/json")
 
-	if err := Post(client, headers, nil, svc.URL, []byte(`test-post`), []int{200}); err != nil {
+	if err := Post(client, headers, nil, svc.URL, bytes.NewReader([]byte(t.Name())), 200); err != nil {
 		t.Errorf("post error: %s", err)
 	}
 }
@@ -66,12 +65,12 @@ func TestPostWithAuth(t *testing.T) {
 	}))
 	defer svc.Close()
 
-	secrets := &secret.JSON{
+	htpasswd := &Passwd{
 		User: "user",
 		Pass: "pass",
 	}
 
-	if err := Post(client, nil, secrets, svc.URL, []byte(t.Name()), []int{200}); err != nil {
+	if err := Post(client, nil, htpasswd, svc.URL, bytes.NewReader([]byte(t.Name())), 200); err != nil {
 		t.Errorf("post error: %s", err)
 	}
 }

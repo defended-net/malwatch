@@ -14,6 +14,7 @@ import (
 	"github.com/defended-net/malwatch/pkg/cli/restore"
 	"github.com/defended-net/malwatch/pkg/cli/scan"
 	"github.com/defended-net/malwatch/pkg/cli/sig"
+	"github.com/defended-net/malwatch/pkg/cli/submit"
 )
 
 // cmds stores arg:cmd layout.
@@ -24,6 +25,7 @@ var cmds = cli.Sub{
 	"quarantine": quarantine.Cmd(),
 	"exile":      exile.Cmd(),
 	"restore":    restore.Cmd(),
+	"submit":     submit.Cmd(),
 	"signatures": sig.Cmd(),
 	"info":       info.Cmd(),
 	"install":    install.Cmd(),

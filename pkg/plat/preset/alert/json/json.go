@@ -4,6 +4,7 @@
 package json
 
 import (
+	"bytes"
 	"encoding/json"
 	"log/slog"
 	"net/http"
@@ -11,7 +12,6 @@ import (
 	"time"
 
 	"github.com/defended-net/malwatch/pkg/boot/env"
-	"github.com/defended-net/malwatch/pkg/boot/env/cfg/secret"
 	client "github.com/defended-net/malwatch/pkg/client/http"
 	"github.com/defended-net/malwatch/pkg/plat"
 	"github.com/defended-net/malwatch/pkg/scan/state"
@@ -21,7 +21,7 @@ import (
 type Sender struct {
 	client     *http.Client
 	cfg        *Cfg
-	secrets    *secret.JSON
+	htpass     *client.Passwd
 	identifier string
 }
 
@@ -40,13 +40,18 @@ var statuses = []int{
 
 // New returns a new sender.
 func New(env *env.Env) *Sender {
+	htpass := &client.Passwd{
+		User: env.Cfg.Secrets.Alerts.JSON.User,
+		Pass: env.Cfg.Secrets.Alerts.JSON.Pass,
+	}
+
 	sender := &Sender{
 		client: &http.Client{
 			Timeout: 5 * time.Second,
 		},
 
 		cfg:        NewCfg(filepath.Join(env.Paths.Alerts.Dir, "json.toml")),
-		secrets:    env.Cfg.Secrets.Alerts.JSON,
+		htpass:     htpass,
 		identifier: env.Cfg.Identifier,
 	}
 
@@ -67,7 +72,7 @@ func (sender *Sender) Alert(result *state.Result) error {
 		return err
 	}
 
-	return client.Post(sender.client, nil, sender.secrets, sender.cfg.Endpoint, payload, statuses)
+	return client.Post(sender.client, nil, sender.htpass, sender.cfg.Endpoint, bytes.NewBuffer(payload), statuses...)
 }
 
 // NewAlert creates an alert.
