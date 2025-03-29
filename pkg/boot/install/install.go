@@ -38,15 +38,13 @@ func Run(env *env.Env) error {
 	}
 
 	// First create needed dirs.
-	dirs := []string{
+	for _, dir := range []string{
 		env.Paths.Cfg.Dir,
 		env.Paths.Alerts.Dir,
 		env.Paths.Sigs.Dir,
 		env.Paths.Plat.Dir,
 		env.Paths.Install.Tmp,
-	}
-
-	for _, dir := range dirs {
+	} {
 		if err := os.MkdirAll(dir, 0750); err != nil {
 			return err
 		}
@@ -63,6 +61,8 @@ func Run(env *env.Env) error {
 
 	env.Cfg.Acts = act.New(env.Paths.Cfg.Acts)
 	env.Cfg.Secrets = secret.New(env.Paths.Cfg.Secrets)
+
+	env.Cfg.Secrets.Submit.Endpoint = "https://api.defended.net/malwatch/submit"
 
 	env.Cfg.Acts.Default = []string{"alert"}
 	env.Cfg.Acts.Clean = act.Clean{
@@ -85,12 +85,10 @@ func Run(env *env.Env) error {
 		},
 	}
 
-	cfgs := []cfg.Cfg{
+	for _, cfg := range []cfg.Cfg{
 		env.Cfg.Acts,
 		env.Cfg.Secrets,
-	}
-
-	for _, cfg := range cfgs {
+	} {
 		if err := fsys.WriteTOML(cfg.Path(), cfg); err != nil {
 			return err
 		}

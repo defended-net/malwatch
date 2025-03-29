@@ -33,7 +33,11 @@ func TestLoad(t *testing.T) {
 	  Port = 587
 	  User = ""
 	  Pass = ""
-  
+
+  [Submit]
+    Endpoint = ""
+    Key = ""
+
   [S3]
 	Endpoint = ""
 	Region = ""

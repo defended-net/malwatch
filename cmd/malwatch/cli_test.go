@@ -112,6 +112,14 @@ func TestLayout(t *testing.T) {
 			want: string("sig.Refresh"),
 		},
 
+		"submit": {
+			input: []string{
+				"submit",
+			},
+
+			want: help.ErrSubmit.Error(),
+		},
+
 		"info": {
 			input: []string{
 				"info",
