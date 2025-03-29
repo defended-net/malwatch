@@ -4,19 +4,29 @@
 package http
 
 import (
-	"bytes"
 	"fmt"
+	"io"
 	"net/http"
 	"slices"
 	"strconv"
-
-	"github.com/defended-net/malwatch/pkg/boot/env/cfg/secret"
 )
+
+// Passwd represents htpasswd.
+type Passwd struct {
+	User string
+	Pass string
+}
 
 // Post sends a post request.
 // statuses define happy status codes.
-func Post(client *http.Client, hdrs http.Header, secrets *secret.JSON, endpoint string, payload []byte, statuses []int) error {
-	req, err := http.NewRequest("POST", endpoint, bytes.NewBuffer(payload))
+func Post(client *http.Client,
+	hdrs http.Header,
+	auth *Passwd,
+	endpoint string,
+	rdr io.Reader,
+	statuses ...int,
+) error {
+	req, err := http.NewRequest(http.MethodPost, endpoint, rdr)
 	if err != nil {
 		return fmt.Errorf("%w, %v", ErrReqPrep, err)
 	}
@@ -25,8 +35,8 @@ func Post(client *http.Client, hdrs http.Header, secrets *secret.JSON, endpoint 
 		req.Header = hdrs
 	}
 
-	if secrets != nil {
-		req.SetBasicAuth(secrets.User, secrets.Pass)
+	if auth != nil {
+		req.SetBasicAuth(auth.User, auth.Pass)
 	}
 
 	resp, err := client.Do(req)
@@ -34,9 +44,14 @@ func Post(client *http.Client, hdrs http.Header, secrets *secret.JSON, endpoint 
 		return fmt.Errorf("%w, %v", ErrReqDo, err)
 	}
 
-	if !slices.Contains(statuses, resp.StatusCode) {
-		return fmt.Errorf("%w, %v", ErrBadStatus, strconv.Itoa(resp.StatusCode))
+	body, err := io.ReadAll(resp.Body)
+	if err != nil {
+		return fmt.Errorf("%w, %v, %v, %v", ErrReqDo, err, "body", string(body))
 	}
 
-	return err
+	if !slices.Contains(statuses, resp.StatusCode) {
+		return fmt.Errorf("%w, %v, %v, %v", ErrBadStatus, strconv.Itoa(resp.StatusCode), "body", string(body))
+	}
+
+	return nil
 }

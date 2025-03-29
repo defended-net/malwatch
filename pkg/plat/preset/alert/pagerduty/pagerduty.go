@@ -4,6 +4,7 @@
 package pagerduty
 
 import (
+	"bytes"
 	"encoding/json"
 	"fmt"
 	"log/slog"
@@ -42,7 +43,7 @@ type Payload struct {
 	Details  *state.Result `json:"custom_details"`
 }
 
-var statusOK = []int{
+var statuses = []int{
 	http.StatusOK,
 	http.StatusAccepted,
 	http.StatusCreated,
@@ -78,7 +79,7 @@ func (sender *Sender) Alert(result *state.Result) error {
 		return err
 	}
 
-	return client.Post(sender.client, nil, nil, sender.cfg.Endpoint, payload, statusOK)
+	return client.Post(sender.client, nil, nil, sender.cfg.Endpoint, bytes.NewBuffer(payload), statuses...)
 }
 
 // NewAlert creates an alert.
