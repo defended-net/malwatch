@@ -5,8 +5,9 @@ builds:
   main: ./cmd/malwatch
   env:
     - CGO_ENABLED=1
+    - CC=/usr/bin/x86_64-linux-musl-gcc
   ldflags:
-    - -w -s -X github.com/defended-net/malwatch/pkg/boot/env.ver={{.Version}}
+    - -w -s -linkmode external -extldflags -static -X github.com/defended-net/malwatch/pkg/boot/env.ver={{.Version}}
   flags:
     - -trimpath
   goos:
@@ -18,8 +19,9 @@ builds:
   main: ./cmd/malwatch-monitor
   env:
     - CGO_ENABLED=1
+    - CC=/usr/bin/x86_64-linux-musl-gcc
   ldflags:
-    - -w -s -X github.com/defended-net/malwatch/pkg/boot/env.ver={{.Version}}
+    - -w -s -linkmode external -extldflags -static -X github.com/defended-net/malwatch/pkg/boot/env.ver={{.Version}}
   flags:
     - -trimpath
   goos:

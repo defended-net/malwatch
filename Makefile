@@ -28,4 +28,4 @@ race:
 ## build: compile binary to dir /tmp/malwatch/
 .PHONY: build
 build:
-	go build -trimpath -ldflags="-w -s" -o=/tmp/malwatch/ ./cmd/malwatch
+	CC=/usr/bin/x86_64-linux-musl-gcc go build -trimpath -ldflags="-w -s -linkmode external -extldflags -static" -o=/tmp/malwatch/ ./cmd/malwatch
