@@ -4,7 +4,7 @@ ENV GOOS=linux \
     GOARCH=amd64 \
     CGO_ENABLED=1
 
-RUN apk update && apk add --no-cache gcc linux-headers libc-dev
+RUN apk update && apk add --no-cache gcc libc-dev musl-dev linux-headers
 
 WORKDIR $GOPATH/src/malwatch/
 COPY . .
