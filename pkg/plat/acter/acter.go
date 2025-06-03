@@ -17,7 +17,7 @@ type Acter interface {
 }
 
 // Load loads given acters filtering on enabled.
-func Load(acters []Acter) error {
+func Load(acters []Acter) ([]Acter, error) {
 	enabled := []Acter{}
 
 	for _, acter := range acters {
@@ -28,15 +28,13 @@ func Load(acters []Acter) error {
 			continue
 
 		case err != nil:
-			return err
+			return nil, err
 		}
 
 		enabled = append(enabled, acter)
 	}
 
-	acters = enabled
-
-	return nil
+	return enabled, nil
 }
 
 // Get returns a verb's acter.

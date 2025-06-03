@@ -83,17 +83,14 @@ func New(env *env.Env) *Plat {
 	}
 }
 
-// Load reads given plat cfg files.
+// Load reads given plat's cfgs.
 func (plat *Plat) Load() error {
-	enabled := []acter.Acter{}
-
-	for _, acter := range plat.acters {
-		if err := acter.Load(); err == nil {
-			enabled = append(enabled, acter)
-		}
+	acters, err := acter.Load(plat.acters)
+	if err != nil {
+		return err
 	}
 
-	plat.acters = enabled
+	plat.acters = acters
 
 	re.SetTargets(reTarget)
 
@@ -170,7 +167,7 @@ func Mock(name string, dir string) (*Plat, error) {
 		env: env,
 
 		acters: []acter.Acter{
-			acter.Mock(name),
+			acter.Mock(name, true),
 		},
 
 		cfg: &Cfg{

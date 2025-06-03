@@ -10,8 +10,10 @@ import (
 	"github.com/defended-net/malwatch/pkg/scan/state"
 )
 
-func TestLoad(t *testing.T) {
-	input := &mock{}
+func TestMockLoad(t *testing.T) {
+	input := &mock{
+		isEnabled: true,
+	}
 
 	if got := input.Load(); got != nil {
 		t.Errorf("unexpected verb result %v, want %v", got, nil)
@@ -46,10 +48,11 @@ func TestMock(t *testing.T) {
 	var (
 		input = t.Name()
 
-		got = Mock(input)
+		got = Mock(input, true)
 
 		want = &mock{
-			verb: input,
+			verb:      input,
+			isEnabled: true,
 		}
 	)
 

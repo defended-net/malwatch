@@ -97,7 +97,7 @@ func TestCfg(t *testing.T) {
 
 func TestActers(t *testing.T) {
 	var (
-		input = acter.Mock(act.VerbAlert)
+		input = acter.Mock(act.VerbAlert, true)
 
 		plat = &Plat{
 			acters: []acter.Acter{

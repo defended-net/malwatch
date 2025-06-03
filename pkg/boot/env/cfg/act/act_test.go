@@ -33,10 +33,10 @@ var (
 	}
 
 	acts = []acter.Acter{
-		acter.Mock(verbs[0]),
-		acter.Mock(verbs[1]),
-		acter.Mock(verbs[2]),
-		acter.Mock(verbs[3]),
+		acter.Mock(verbs[0], true),
+		acter.Mock(verbs[1], true),
+		acter.Mock(verbs[2], true),
+		acter.Mock(verbs[3], true),
 	}
 )
 
