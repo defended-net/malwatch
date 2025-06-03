@@ -69,18 +69,11 @@ type Meta struct {
 // New returns a plat from given env.
 func New(env *env.Env) *Plat {
 	return &Plat{
-		env: env,
-
-		acters: []acter.Acter{
-			act.NewExiler(env),
-			act.NewQuarantiner(env),
-			act.NewCleaner(env),
-			act.NewAlerter(env),
-		},
+		env:    env,
+		acters: act.Preset(env),
 
 		cfg: &Cfg{
-			path:     filepath.Join(env.Paths.Plat.Dir, "cpanel.toml"),
-			SkipAccs: []string{""},
+			path: filepath.Join(env.Paths.Plat.Dir, "cpanel.toml"),
 		},
 
 		// Path to whmapi. Must be absolute for CL compat https://api.docs.cpanel.net/whm/introduction
