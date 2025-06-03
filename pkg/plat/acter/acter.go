@@ -4,6 +4,8 @@
 package acter
 
 import (
+	"errors"
+
 	"github.com/defended-net/malwatch/pkg/scan/state"
 )
 
@@ -12,6 +14,29 @@ type Acter interface {
 	Load() error
 	Verb() string
 	Act(*state.Result) error
+}
+
+// Load loads given acters filtering on enabled.
+func Load(acters []Acter) error {
+	enabled := []Acter{}
+
+	for _, acter := range acters {
+		err := acter.Load()
+
+		switch {
+		case errors.Is(err, ErrDisabled):
+			continue
+
+		case err != nil:
+			return err
+		}
+
+		enabled = append(enabled, acter)
+	}
+
+	acters = enabled
+
+	return nil
 }
 
 // Get returns a verb's acter.
