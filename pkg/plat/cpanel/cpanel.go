@@ -4,15 +4,14 @@
 package cpanel
 
 import (
-	"bytes"
 	"encoding/json"
 	"fmt"
-	"os/exec"
 	"path/filepath"
 	"slices"
 
 	"github.com/defended-net/malwatch/pkg/boot/env"
 	"github.com/defended-net/malwatch/pkg/boot/env/re"
+	"github.com/defended-net/malwatch/pkg/exec"
 	"github.com/defended-net/malwatch/pkg/plat"
 	"github.com/defended-net/malwatch/pkg/plat/acter"
 	"github.com/defended-net/malwatch/pkg/plat/preset/act"
@@ -128,7 +127,7 @@ func (plat *Plat) Load() error {
 	return nil
 }
 
-// GetDocRoots performs a get_domain_info request and returns document root paths.
+// GetDocRoots performs a get_domain_info request and returns docroot paths.
 func (plat *Plat) GetDocRoots() ([]string, error) {
 	var (
 		info  = &DomainInfo{}
@@ -141,12 +140,12 @@ func (plat *Plat) GetDocRoots() ([]string, error) {
 		args = plat.domainInfo
 	}
 
-	resp, err := plat.Exec(args...)
+	resp, err := exec.Run(plat.bin, args...)
 	if err != nil {
 		return nil, err
 	}
 
-	if err := json.Unmarshal(resp, info); err != nil {
+	if err := json.Unmarshal([]byte(resp), info); err != nil {
 		return nil, fmt.Errorf("%w, %v", ErrAPIDomInfoUnmarshal, err)
 	}
 
@@ -157,20 +156,6 @@ func (plat *Plat) GetDocRoots() ([]string, error) {
 	return paths, nil
 }
 
-// Exec performs an api lookup using whmapi cmd.
-func (plat *Plat) Exec(args ...string) ([]byte, error) {
-	buff := bytes.Buffer{}
-
-	cmd := exec.Command(plat.bin, args...)
-	cmd.Stdout = &buff
-
-	if err := cmd.Run(); err != nil {
-		return nil, fmt.Errorf("%w, %v", ErrAPIToolExec, err)
-	}
-
-	return buff.Bytes(), nil
-}
-
 // Acters returns a given cpanel plat's active acts.
 func (plat *Plat) Acters() []acter.Acter {
 	return plat.acters
@@ -179,4 +164,91 @@ func (plat *Plat) Acters() []acter.Acter {
 // Cfg returns a given cpanel plat's cfg.
 func (plat *Plat) Cfg() plat.Cfg {
 	return plat.cfg
+}
+
+// Mock mocks a plat.
+func Mock(name string, dir string) (*Plat, error) {
+	env, err := env.Mock(name, dir)
+	if err != nil {
+		return nil, err
+	}
+
+	return &Plat{
+		env: env,
+
+		acters: []acter.Acter{
+			acter.Mock(name),
+		},
+
+		cfg: &Cfg{
+			path: filepath.Join(env.Paths.Plat.Dir, "directadmin.toml"),
+		},
+
+		bin: "echo",
+
+		domainInfo: []string{`{
+    "data": {
+        "domains": [
+            {
+                "ipv4": "123.123.123.123",
+                "modsecurity_enabled": 1,
+                "php_version": "ea-php81",
+                "user_owner": "first",
+                "user": "first",
+                "domain_type": "main",
+                "ipv6": null,
+                "port": "80",
+                "port_ssl": "443",
+                "ipv6_is_dedicated": 0,
+                "domain": "first.com",
+                "parent_domain": "one.example",
+                "docroot": "/home/one/public_html",
+                "ipv4_ssl": "123.123.123.123"
+            },
+
+            {
+                "ipv6": null,
+                "port": "80",
+                "php_version": "ea-php81",
+                "modsecurity_enabled": 1,
+                "ipv4": "123.123.123.123",
+                "user": "second",
+                "domain_type": "main",
+                "user_owner": "second",
+                "ipv4_ssl": "123.123.123.123",
+                "docroot": "/home/two/public_html",
+                "parent_domain": "two.example",
+                "port_ssl": "443",
+                "domain": "second.com",
+                "ipv6_is_dedicated": 0
+            },
+
+            {
+                "ipv4": "123.123.123.123",
+                "modsecurity_enabled": 1,
+                "php_version": "ea-php81",
+                "user_owner": "third",
+                "user": "third",
+                "domain_type": "main",
+                "ipv6": null,
+                "port": "80",
+                "port_ssl": "443",
+                "ipv6_is_dedicated": 0,
+                "domain": "third.com",
+                "parent_domain": "three.example",
+                "docroot": "/home/three/public_html",
+                "ipv4_ssl": "123.123.123.123"
+            }
+        ]
+    },
+    
+    "metadata": {
+        "result": 1,
+        "version": 1,
+        "reason": "OK",
+        "command": "get_domain_info"
+    }
+}`,
+		},
+	}, nil
 }

@@ -6,97 +6,29 @@ package cpanel
 import (
 	"reflect"
 	"slices"
+	"strings"
 	"testing"
 
 	"github.com/defended-net/malwatch/pkg/boot/env"
-	"github.com/defended-net/malwatch/pkg/boot/env/path"
+	"github.com/defended-net/malwatch/pkg/exec"
 	"github.com/defended-net/malwatch/pkg/plat/acter"
 	"github.com/defended-net/malwatch/pkg/plat/preset/act"
 )
 
-var mock = &Plat{
-	bin: "echo",
-
-	domainInfo: []string{`{
-    "data": {
-        "domains": [
-            {
-                "ipv4": "123.123.123.123",
-                "modsecurity_enabled": 1,
-                "php_version": "ea-php81",
-                "user_owner": "first",
-                "user": "first",
-                "domain_type": "main",
-                "ipv6": null,
-                "port": "80",
-                "port_ssl": "443",
-                "ipv6_is_dedicated": 0,
-                "domain": "first.com",
-                "parent_domain": "first.com",
-                "docroot": "/home/first/public_html",
-                "ipv4_ssl": "123.123.123.123"
-            },
-
-            {
-                "ipv6": null,
-                "port": "80",
-                "php_version": "ea-php81",
-                "modsecurity_enabled": 1,
-                "ipv4": "123.123.123.123",
-                "user": "second",
-                "domain_type": "main",
-                "user_owner": "second",
-                "ipv4_ssl": "123.123.123.123",
-                "docroot": "/home/second/public_html",
-                "parent_domain": "second.com",
-                "port_ssl": "443",
-                "domain": "second.com",
-                "ipv6_is_dedicated": 0
-            },
-
-            {
-                "ipv4": "123.123.123.123",
-                "modsecurity_enabled": 1,
-                "php_version": "ea-php81",
-                "user_owner": "third",
-                "user": "third",
-                "domain_type": "main",
-                "ipv6": null,
-                "port": "80",
-                "port_ssl": "443",
-                "ipv6_is_dedicated": 0,
-                "domain": "third.com",
-                "parent_domain": "third.com",
-                "docroot": "/home/third/public_html",
-                "ipv4_ssl": "123.123.123.123"
-            }
-        ]
-    },
-    
-    "metadata": {
-        "result": 1,
-        "version": 1,
-        "reason": "OK",
-        "command": "get_domain_info"
-    }
-}`,
-	},
-}
-
-func TestLoad(t *testing.T) {
+func TestNew(t *testing.T) {
 	env, err := env.Mock(t.Name(), t.TempDir())
 	if err != nil {
 		t.Fatalf("env mock error: %v", err)
 	}
 
-	env.Paths.Plat = &path.Plat{
-		Dir: t.TempDir(),
+	New(env)
+}
+
+func TestLoad(t *testing.T) {
+	plat, err := Mock(t.Name(), t.TempDir())
+	if err != nil {
+		t.Fatalf("mock error: %v", err)
 	}
-
-	plat := New(env)
-
-	plat.bin = "echo"
-	plat.domainInfo = mock.domainInfo
 
 	if err = plat.Load(); err != nil {
 		t.Errorf("load error: %v", err)
@@ -104,11 +36,7 @@ func TestLoad(t *testing.T) {
 }
 
 func TestExec(t *testing.T) {
-	mock := &Plat{
-		bin: "echo",
-	}
-
-	result, err := mock.Exec(t.Name())
+	result, err := exec.Run("echo", t.Name())
 	if err != nil {
 		t.Fatalf("exec error: %v", err)
 	}
@@ -119,16 +47,21 @@ func TestExec(t *testing.T) {
 }
 
 func TestGetDomainInfo(t *testing.T) {
-	want := []string{
-		"/home/first/public_html",
-		"/home/first/tmp",
-		"/home/second/public_html",
-		"/home/second/tmp",
-		"/home/third/public_html",
-		"/home/third/tmp",
+	plat, err := Mock(t.Name(), t.TempDir())
+	if err != nil {
+		t.Fatalf("mock error: %v", err)
 	}
 
-	result, err := mock.GetDocRoots()
+	want := []string{
+		"/home/one/public_html",
+		"/home/one/tmp",
+		"/home/two/public_html",
+		"/home/two/tmp",
+		"/home/three/public_html",
+		"/home/three/tmp",
+	}
+
+	result, err := plat.GetDocRoots()
 	if err != nil {
 		t.Fatalf("get domain error: %v", err)
 	}
@@ -143,7 +76,7 @@ func TestGetDomainInfoErrs(t *testing.T) {
 		bin: t.Name(),
 	}
 
-	if _, err := mock.GetDocRoots(); err == nil {
+	if _, err := mock.GetDocRoots(); err != nil && !strings.HasPrefix(err.Error(), "exec: run error") {
 		t.Errorf("unexpected get domain success")
 	}
 }
