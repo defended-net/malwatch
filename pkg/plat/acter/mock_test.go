@@ -10,7 +10,7 @@ import (
 	"github.com/defended-net/malwatch/pkg/scan/state"
 )
 
-func TestMockLoad(t *testing.T) {
+func TestLoad(t *testing.T) {
 	input := &mock{
 		isEnabled: true,
 	}

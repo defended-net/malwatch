@@ -9,6 +9,7 @@ import (
 
 	"github.com/defended-net/malwatch/pkg/boot/env"
 	"github.com/defended-net/malwatch/pkg/fsys"
+	"github.com/defended-net/malwatch/pkg/plat/acter"
 	"github.com/defended-net/malwatch/pkg/scan/state"
 )
 
@@ -29,7 +30,7 @@ func NewQuarantiner(env *env.Env) *Quarantiner {
 // Load loads a given quarantiner.
 func (quarantiner *Quarantiner) Load() error {
 	if quarantiner.dir == "" {
-		return ErrDisabled
+		return acter.ErrDisabled
 	}
 
 	return nil

@@ -10,5 +10,5 @@ var (
 	ErrDisabled = errors.New("acter: disabled")
 
 	// ErrVerbUnknown means verb is unknown.
-	ErrVerbUnknown = errors.New("act: unknown verb")
+	ErrVerbUnknown = errors.New("acter: unknown verb")
 )

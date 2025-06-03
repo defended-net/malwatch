@@ -25,33 +25,20 @@ type Cfg struct {
 // New returns a plat from given env.
 func New(env *env.Env) *Plat {
 	return &Plat{
-		env: env,
-
-		acters: []acter.Acter{
-			act.NewExiler(env),
-			act.NewQuarantiner(env),
-			act.NewCleaner(env),
-			act.NewAlerter(env),
-		},
-
-		// default plat, not much of a cfg.
-		cfg: &Cfg{
-			path: "",
-		},
+		env:    env,
+		acters: act.Preset(env),
+		cfg:    &Cfg{},
 	}
 }
 
 // Load reads given plat cfg files.
 func (plat *Plat) Load() error {
-	enabled := []acter.Acter{}
-
-	for _, acter := range plat.acters {
-		if err := acter.Load(); err == nil {
-			enabled = append(enabled, acter)
-		}
+	acters, err := acter.Load(plat.acters)
+	if err != nil {
+		return err
 	}
 
-	plat.acters = enabled
+	plat.acters = acters
 
 	return nil
 }

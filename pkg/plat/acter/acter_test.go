@@ -11,28 +11,6 @@ import (
 	"github.com/defended-net/malwatch/pkg/scan/state"
 )
 
-func TestLoad(t *testing.T) {
-	var (
-		input = []Acter{
-			Mock(t.Name(), true),
-			Mock(t.Name()+"-disabled", false),
-		}
-
-		want = []Acter{
-			input[0],
-		}
-	)
-
-	got, err := Load(input)
-	if err != nil {
-		t.Fatalf("load error: %s", err)
-	}
-
-	if !reflect.DeepEqual(got, want) {
-		t.Errorf("unexpected load result %v, want %v", got, want)
-	}
-}
-
 func TestGet(t *testing.T) {
 	var (
 		input = t.Name()
