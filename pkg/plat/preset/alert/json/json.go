@@ -14,13 +14,14 @@ import (
 	"github.com/defended-net/malwatch/pkg/boot/env"
 	client "github.com/defended-net/malwatch/pkg/client/http"
 	"github.com/defended-net/malwatch/pkg/plat"
+	"github.com/defended-net/malwatch/pkg/plat/acter"
 	"github.com/defended-net/malwatch/pkg/scan/state"
 )
 
 // Sender represents the sender.
 type Sender struct {
-	client     *http.Client
 	cfg        *Cfg
+	client     *http.Client
 	htpass     *client.Passwd
 	identifier string
 }
@@ -40,22 +41,33 @@ var statuses = []int{
 
 // New returns a new sender.
 func New(env *env.Env) *Sender {
-	htpass := &client.Passwd{
-		User: env.Cfg.Secrets.Alerts.JSON.User,
-		Pass: env.Cfg.Secrets.Alerts.JSON.Pass,
-	}
+	return &Sender{
+		cfg: NewCfg(filepath.Join(env.Paths.Alerts.Dir, "json.toml")),
 
-	sender := &Sender{
 		client: &http.Client{
 			Timeout: 5 * time.Second,
 		},
 
-		cfg:        NewCfg(filepath.Join(env.Paths.Alerts.Dir, "json.toml")),
-		htpass:     htpass,
+		htpass: &client.Passwd{
+			User: env.Cfg.Secrets.Alerts.JSON.User,
+			Pass: env.Cfg.Secrets.Alerts.JSON.Pass,
+		},
+
 		identifier: env.Cfg.Identifier,
 	}
+}
 
-	return sender
+// Load loads the alerter.
+func (sender *Sender) Load() error {
+	if err := sender.cfg.Load(); err != nil {
+		return err
+	}
+
+	if sender.cfg.Endpoint == "" {
+		return acter.ErrDisabled
+	}
+
+	return nil
 }
 
 // Alert sends an alert.
@@ -92,11 +104,6 @@ func (sender *Sender) NewAlert(result *state.Result) ([]byte, error) {
 	}
 
 	return payload, nil
-}
-
-// Load loads the alerter.
-func (sender *Sender) Load() error {
-	return sender.cfg.Load()
 }
 
 // Cfg returns the cfg.

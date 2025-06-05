@@ -6,33 +6,30 @@ package cpanel
 import (
 	"os"
 	"path/filepath"
-	"reflect"
 	"testing"
 )
 
 func TestCfgLoad(t *testing.T) {
-	path := filepath.Join(t.TempDir(), t.Name())
+	var (
+		path = filepath.Join(t.TempDir(), t.Name())
+
+		input = &Cfg{
+			path: path,
+		}
+	)
 
 	if _, err := os.Create(path); err != nil {
 		t.Fatalf("file create error: %v", err)
 	}
 
-	var (
-		input = &Cfg{
-			path: path,
-		}
-
-		got = input.Load()
-	)
-
-	if !reflect.DeepEqual(got, nil) {
-		t.Errorf("unexpected cfg load result %v, want %v", got, nil)
+	if err := input.Load(); err != nil {
+		t.Errorf("cfg load error: %v", err)
 	}
 }
 
 func TestCfgPath(t *testing.T) {
 	var (
-		want = filepath.Join(t.TempDir(), t.Name())
+		want = t.Name()
 
 		plat = &Plat{
 			cfg: &Cfg{
@@ -43,7 +40,7 @@ func TestCfgPath(t *testing.T) {
 		got = plat.cfg.Path()
 	)
 
-	if !reflect.DeepEqual(got, want) {
-		t.Errorf("unexpected cfg result %v, want %v", got, want)
+	if got != want {
+		t.Errorf("unexpected cfg path %v, want %v", got, want)
 	}
 }

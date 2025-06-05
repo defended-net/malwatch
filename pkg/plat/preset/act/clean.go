@@ -19,6 +19,7 @@ import (
 	"github.com/defended-net/malwatch/pkg/boot/env/cfg/act"
 	"github.com/defended-net/malwatch/pkg/db/orm/hit"
 	"github.com/defended-net/malwatch/pkg/fsys"
+	"github.com/defended-net/malwatch/pkg/plat/acter"
 	"github.com/defended-net/malwatch/pkg/scan/state"
 	"github.com/defended-net/malwatch/pkg/sig"
 	"github.com/defended-net/malwatch/third_party/yr"
@@ -48,7 +49,7 @@ func NewCleaner(env *env.Env) *Cleaner {
 // Load loads given cleaner.
 func (cleaner *Cleaner) Load() error {
 	if cleaner.dir == "" {
-		return ErrDisabled
+		return acter.ErrDisabled
 	}
 
 	rules, err := yr.LoadRules(cleaner.rules)

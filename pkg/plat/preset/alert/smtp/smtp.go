@@ -14,6 +14,7 @@ import (
 	"github.com/defended-net/malwatch/pkg/boot/env"
 	"github.com/defended-net/malwatch/pkg/boot/env/cfg/secret"
 	"github.com/defended-net/malwatch/pkg/plat"
+	"github.com/defended-net/malwatch/pkg/plat/acter"
 	"github.com/defended-net/malwatch/pkg/scan/state"
 )
 
@@ -27,15 +28,12 @@ type Sender struct {
 
 // New returns a new transport.
 func New(env *env.Env) *Sender {
-	var (
-		sender = &Sender{
-			cfg:        NewCfg(filepath.Join(env.Paths.Alerts.Dir, "smtp.toml")),
-			secrets:    env.Cfg.Secrets.Alerts.SMTP,
-			identifier: env.Cfg.Identifier,
-		}
-	)
+	return &Sender{
+		cfg: NewCfg(filepath.Join(env.Paths.Alerts.Dir, "smtp.toml")),
 
-	return sender
+		secrets:    env.Cfg.Secrets.Alerts.SMTP,
+		identifier: env.Cfg.Identifier,
+	}
 }
 
 // Load loads alerter cfg files.
@@ -44,9 +42,15 @@ func (sender *Sender) Load() error {
 		return err
 	}
 
+	if sender.secrets.Hostname == "" {
+		return acter.ErrDisabled
+	}
+
 	client, err := mail.NewClient(sender.secrets.Hostname,
-		mail.WithSMTPAuth(mail.SMTPAuthPlain), mail.WithTLSPortPolicy(mail.TLSMandatory),
-		mail.WithUsername(sender.secrets.User), mail.WithPassword(sender.secrets.Pass),
+		mail.WithSMTPAuth(mail.SMTPAuthPlain),
+		mail.WithTLSPortPolicy(mail.TLSMandatory),
+		mail.WithUsername(sender.secrets.User),
+		mail.WithPassword(sender.secrets.Pass),
 	)
 	if err != nil {
 		return err
@@ -66,20 +70,20 @@ func (sender *Sender) Alert(result *state.Result) error {
 		return err
 	}
 
-	message := mail.NewMsg()
+	msg := mail.NewMsg()
 
-	if err := message.From(sender.cfg.From); err != nil {
+	if err := msg.From(sender.cfg.From); err != nil {
 		return err
 	}
 
-	if err := message.To(sender.cfg.To...); err != nil {
+	if err := msg.To(sender.cfg.To...); err != nil {
 		return err
 	}
 
-	message.Subject("malwatch alert - " + sender.identifier)
-	message.SetBodyString(mail.TypeTextPlain, string(hits))
+	msg.Subject("malwatch alert - " + sender.identifier)
+	msg.SetBodyString(mail.TypeTextPlain, string(hits))
 
-	return sender.client.DialAndSend(message)
+	return sender.client.DialAndSend(msg)
 }
 
 // Cfg returns the cfg.

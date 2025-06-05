@@ -36,7 +36,7 @@ func TestDo(t *testing.T) {
 	}
 	defer file.Close()
 
-	env.Plat = plat.Mock(acter.Mock(act.VerbExile))
+	env.Plat = plat.Mock(acter.Mock(act.VerbExile, true))
 
 	if err := Do(env, []string{path}); err != nil {
 		t.Errorf("exile error: %v", err)

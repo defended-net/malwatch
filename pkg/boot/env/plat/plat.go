@@ -11,6 +11,7 @@ import (
 	"github.com/defended-net/malwatch/pkg/fsys"
 	"github.com/defended-net/malwatch/pkg/plat"
 	"github.com/defended-net/malwatch/pkg/plat/cpanel"
+	"github.com/defended-net/malwatch/pkg/plat/directadmin"
 	"github.com/defended-net/malwatch/pkg/plat/preset"
 )
 
@@ -21,6 +22,7 @@ func Load(env *env.Env) error {
 
 	plats := []plat.Plat{
 		cpanel.New(env),
+		directadmin.New(env),
 	}
 
 	for _, plat := range plats {

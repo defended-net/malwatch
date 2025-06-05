@@ -6,9 +6,6 @@ package act
 import "errors"
 
 var (
-	// ErrDisabled means disabled.
-	ErrDisabled = errors.New("act: disabled")
-
 	// ErrCfgLoad means cfg load error.
 	ErrCfgLoad = errors.New("act: cfg load error")
 )

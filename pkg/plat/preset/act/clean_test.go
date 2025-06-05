@@ -18,6 +18,7 @@ import (
 	"github.com/defended-net/malwatch/pkg/boot/env/cfg/act"
 	"github.com/defended-net/malwatch/pkg/db/orm/hit"
 	"github.com/defended-net/malwatch/pkg/fsys"
+	"github.com/defended-net/malwatch/pkg/plat/acter"
 	"github.com/defended-net/malwatch/pkg/scan/state"
 	"github.com/defended-net/malwatch/pkg/sig"
 )
@@ -42,32 +43,24 @@ func TestNewCleaner(t *testing.T) {
 		t.Fatalf("env mock error: %s", err)
 	}
 
-	got := NewCleaner(env)
+	var (
+		got = NewCleaner(env)
 
-	want := &Cleaner{
-		verb:  VerbClean,
-		dir:   env.Cfg.Acts.Quarantine.Dir,
-		blkSz: got.blkSz,
-		expr:  env.Cfg.Acts.Clean,
-		rules: env.Paths.Sigs.Yrc,
-	}
+		want = &Cleaner{
+			verb:  VerbClean,
+			dir:   env.Cfg.Acts.Quarantine.Dir,
+			blkSz: got.blkSz,
+			expr:  env.Cfg.Acts.Clean,
+			rules: env.Paths.Sigs.Yrc,
+		}
+	)
 
 	if !reflect.DeepEqual(got, want) {
 		t.Errorf("unexpected cleaner result %v, want %v", got, want)
 	}
 }
 
-func TestCleanVerb(t *testing.T) {
-	input := &Cleaner{
-		verb: VerbClean,
-	}
-
-	if got := input.Verb(); got != VerbClean {
-		t.Errorf("unexpected verb result %v, want %v", got, VerbClean)
-	}
-}
-
-func TestLoadCleaner(t *testing.T) {
+func TestCleanLoad(t *testing.T) {
 	env, err := env.Mock(t.Name(), t.TempDir())
 	if err != nil {
 		t.Fatalf("env mock error: %s", err)
@@ -77,25 +70,35 @@ func TestLoadCleaner(t *testing.T) {
 		t.Fatalf("sig mock error: %s", err)
 	}
 
-	input := Cleaner{
+	acter := &Cleaner{
 		dir:   t.TempDir(),
 		rules: env.Paths.Sigs.Yrc,
 	}
 
-	if err := input.Load(); err != nil {
+	if err := acter.Load(); err != nil {
 		t.Errorf("cleaner load error: %v", err)
 	}
 }
 
-func TestLoadCleanerNoDir(t *testing.T) {
-	input := Cleaner{}
+func TestCleanDisabled(t *testing.T) {
+	input := &Cleaner{}
 
-	if got := input.Load(); !errors.Is(got, ErrDisabled) {
-		t.Errorf("unexpected cleaner load error %v, want %v", got, ErrDisabled)
+	if got := input.Load(); !errors.Is(got, acter.ErrDisabled) {
+		t.Errorf("unexpected cleaner load error %v, want %v", got, acter.ErrDisabled)
 	}
 }
 
-func TestActClean(t *testing.T) {
+func TestCleanVerb(t *testing.T) {
+	acter := &Cleaner{
+		verb: VerbClean,
+	}
+
+	if got := acter.Verb(); got != VerbClean {
+		t.Errorf("unexpected verb result %v, want %v", got, VerbClean)
+	}
+}
+
+func TestCleanInject(t *testing.T) {
 	env, err := env.Mock(t.Name(), t.TempDir())
 	if err != nil {
 		t.Fatalf("env mock error: %s", err)
@@ -105,13 +108,13 @@ func TestActClean(t *testing.T) {
 		t.Fatalf("sig mock error: %v", err)
 	}
 
-	cleaner := NewCleaner(env)
+	acter := NewCleaner(env)
 
-	if err := cleaner.Load(); err != nil {
+	if err := acter.Load(); err != nil {
 		t.Fatalf("cleaner load error: %s", err)
 	}
 
-	cleaner.expr = act.Clean{
+	acter.expr = act.Clean{
 		"gz": reGz,
 	}
 
@@ -142,20 +145,68 @@ eval(gzinflate(base64_decode('test')));
 			),
 		})
 
-	if err := cleaner.Act(input); err != nil {
+	if err := acter.Act(input); err != nil {
 		t.Errorf("clean act error: %v", err)
 	}
 }
 
-func TestActCleanErrs(t *testing.T) {
-	cleaner := Cleaner{}
+func TestCleanInjectMultiLine(t *testing.T) {
+	env, err := env.Mock(t.Name(), t.TempDir())
+	if err != nil {
+		t.Fatalf("env mock error: %s", err)
+	}
 
-	if err := cleaner.Act(nil); err == nil {
-		t.Errorf("unexpected cleaner act success")
+	if err := sig.Mock(env); err != nil {
+		t.Fatalf("sig mock error: %s", err)
+	}
+
+	acter := &Cleaner{
+		dir:   t.TempDir(),
+		rules: env.Paths.Sigs.Yrc,
+
+		blkSz: 32768,
+
+		expr: map[string][]string{
+			"php_base64_inject": {
+				`s/<?.*eval\(base64_decode\(.*?>//`,
+				`s/<?php.*eval\(base64_decode\(.*?>//`,
+				`s/eval\(base64_decode\([^;]*;//`,
+			},
+		},
+	}
+
+	if err := acter.Load(); err != nil {
+		t.Fatalf("cleaner load error: %v", err)
+	}
+
+	var (
+		path = filepath.Join(t.TempDir(), t.Name())
+
+		sample = `<?php echo "hello world";
+eval(base64_decode("mal"));
+echo "foo";
+eval(base64_decode("ware"));
+?>`
+	)
+
+	if err := os.WriteFile(path, []byte(sample), 0600); err != nil {
+		t.Fatalf("hit file write error: %s", err)
+	}
+
+	if err := acter.clean(path, &hit.Meta{
+		Rules: []string{"php_base64_inject"},
+
+		Attr: &fsys.Attr{
+			UID:  os.Getuid(),
+			GID:  os.Getgid(),
+			Mode: 0600,
+		},
+	}); err != nil {
+		t.Errorf("clean error: %s", err)
 	}
 }
 
-func TestB64Clean(t *testing.T) {
+func TestCleanB64(t *testing.T) {
 	tests := map[string]struct {
 		input string
 		want  string
@@ -198,7 +249,7 @@ eval(base64_decode("test"));
 	}
 }
 
-func TestBase64MultiClean(t *testing.T) {
+func TestCleanB64Multi(t *testing.T) {
 	tests := map[string]struct {
 		input string
 		want  string
@@ -240,7 +291,7 @@ echo "foo";
 	}
 }
 
-func TestCleanGzBase64(t *testing.T) {
+func TestCleanGzB64(t *testing.T) {
 	tests := map[string]struct {
 		input string
 		want  string
@@ -278,7 +329,7 @@ eval(gzinflate(base64_decode('test')));
 	}
 }
 
-func TestCleanMultiGzBase64(t *testing.T) {
+func TestCleanMultiGzB64(t *testing.T) {
 	tests := map[string]struct {
 		input string
 		want  string
@@ -364,58 +415,13 @@ echo "foo";
 	}
 }
 
-func TestClean(t *testing.T) {
-	env, err := env.Mock(t.Name(), t.TempDir())
-	if err != nil {
-		t.Fatalf("env mock error: %s", err)
-	}
-
-	if err := sig.Mock(env); err != nil {
-		t.Fatalf("sig mock error: %s", err)
-	}
-
-	cleaner := Cleaner{
-		dir:   t.TempDir(),
-		rules: env.Paths.Sigs.Yrc,
-
-		blkSz: 32768,
-
-		expr: map[string][]string{
-			"php_base64_inject": {
-				`s/<?.*eval\(base64_decode\(.*?>//`,
-				`s/<?php.*eval\(base64_decode\(.*?>//`,
-				`s/eval\(base64_decode\([^;]*;//`,
-			},
-		},
-	}
-
-	if err := cleaner.Load(); err != nil {
-		t.Fatalf("cleaner load error: %v", err)
-	}
-
+func TestCleanErrs(t *testing.T) {
 	var (
-		path = filepath.Join(t.TempDir(), t.Name())
-
-		sample = `<?php echo "hello world";
-eval(base64_decode("mal"));
-echo "foo";
-eval(base64_decode("ware"));
-?>`
+		input = &Cleaner{}
+		want  = ErrQuarantineNoDir
 	)
 
-	if err := os.WriteFile(path, []byte(sample), 0600); err != nil {
-		t.Fatalf("hit file write error: %s", err)
-	}
-
-	if err := cleaner.clean(path, &hit.Meta{
-		Rules: []string{"php_base64_inject"},
-
-		Attr: &fsys.Attr{
-			UID:  os.Getuid(),
-			GID:  os.Getgid(),
-			Mode: 0600,
-		},
-	}); err != nil {
-		t.Errorf("clean error: %s", err)
+	if err := input.Act(nil); !errors.Is(err, want) {
+		t.Errorf("unexpected clean error %v, want %v", input, want)
 	}
 }

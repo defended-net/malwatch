@@ -8,14 +8,16 @@ import (
 )
 
 type mock struct {
-	verb  string
-	Acted bool
+	verb      string
+	isEnabled bool
+	Acted     bool
 }
 
 // Mock mocks an acter.
-func Mock(verb string) Acter {
+func Mock(verb string, enabled bool) Acter {
 	return &mock{
-		verb: verb,
+		verb:      verb,
+		isEnabled: enabled,
 	}
 }
 
@@ -26,6 +28,10 @@ func (act *mock) Verb() string {
 
 // Load loads the quarantiner.
 func (act *mock) Load() error {
+	if !act.isEnabled {
+		return ErrDisabled
+	}
+
 	return nil
 }
 

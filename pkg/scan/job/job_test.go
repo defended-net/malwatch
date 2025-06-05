@@ -169,7 +169,7 @@ func TestNew(t *testing.T) {
 
 func TestActs(t *testing.T) {
 	var (
-		mock   = acter.Mock(t.Name())
+		mock   = acter.Mock(t.Name(), true)
 		result = &state.Result{}
 	)
 

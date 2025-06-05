@@ -16,13 +16,14 @@ import (
 	"github.com/defended-net/malwatch/pkg/boot/env/cfg/secret"
 	client "github.com/defended-net/malwatch/pkg/client/http"
 	"github.com/defended-net/malwatch/pkg/plat"
+	"github.com/defended-net/malwatch/pkg/plat/acter"
 	"github.com/defended-net/malwatch/pkg/scan/state"
 )
 
 // Sender represents the sender.
 type Sender struct {
-	client     *http.Client
 	cfg        *Cfg
+	client     *http.Client
 	Identifier string
 	secrets    *secret.PagerDuty
 }
@@ -52,22 +53,29 @@ var statuses = []int{
 
 // New returns a new transport.
 func New(env *env.Env) *Sender {
-	sender := &Sender{
+	return &Sender{
+		cfg: NewCfg(filepath.Join(env.Paths.Alerts.Dir, "pagerduty.toml")),
+
 		client: &http.Client{
 			Timeout: 5 * time.Second,
 		},
 
-		cfg:        NewCfg(filepath.Join(env.Paths.Alerts.Dir, "pagerduty.toml")),
 		Identifier: env.Cfg.Identifier,
 		secrets:    env.Cfg.Secrets.Alerts.PagerDuty,
 	}
-
-	return sender
 }
 
 // Load loads alerter cfg files.
 func (sender *Sender) Load() error {
-	return sender.cfg.Load()
+	if err := sender.cfg.Load(); err != nil {
+		return err
+	}
+
+	if sender.cfg.Endpoint == "" {
+		return acter.ErrDisabled
+	}
+
+	return nil
 }
 
 // Alert sends an alert.

@@ -39,7 +39,7 @@ func TestDo(t *testing.T) {
 		t.Errorf("sigs mock error: %v", err)
 	}
 
-	env.Plat = plat.Mock(acter.Mock(act.VerbQuarantine))
+	env.Plat = plat.Mock(acter.Mock(act.VerbQuarantine, true))
 
 	if err := Do(env, []string{path}); err != nil {
 		t.Errorf("quarantine error: %v", err)

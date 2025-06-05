@@ -16,6 +16,7 @@ import (
 	"github.com/defended-net/malwatch/pkg/db"
 	"github.com/defended-net/malwatch/pkg/db/orm/hit"
 	"github.com/defended-net/malwatch/pkg/fsys"
+	"github.com/defended-net/malwatch/pkg/plat/acter"
 	"github.com/defended-net/malwatch/pkg/scan/state"
 )
 
@@ -39,18 +40,8 @@ func TestNewQuarantiner(t *testing.T) {
 	}
 }
 
-func TestQuarantineVerb(t *testing.T) {
+func TestQuarantineLoad(t *testing.T) {
 	input := &Quarantiner{
-		verb: VerbQuarantine,
-	}
-
-	if got := input.Verb(); got != VerbQuarantine {
-		t.Errorf("unexpected verb result %v, want %v", got, VerbQuarantine)
-	}
-}
-
-func TestLoadQuarantiner(t *testing.T) {
-	input := Quarantiner{
 		dir: t.TempDir(),
 	}
 
@@ -59,11 +50,13 @@ func TestLoadQuarantiner(t *testing.T) {
 	}
 }
 
-func TestLoadQuarantinerEmptyDir(t *testing.T) {
-	input := Quarantiner{}
+func TestQuarantineVerb(t *testing.T) {
+	input := &Quarantiner{
+		verb: VerbQuarantine,
+	}
 
-	if got := input.Load(); !errors.Is(got, ErrDisabled) {
-		t.Errorf("unexpected load error %v, want %v", got, ErrDisabled)
+	if got := input.Verb(); got != VerbQuarantine {
+		t.Errorf("unexpected verb result %v, want %v", got, VerbQuarantine)
 	}
 }
 
@@ -100,12 +93,34 @@ func TestQuarantine(t *testing.T) {
 				"quarantine"),
 		})
 
-	quarantiner := Quarantiner{
+	acter := &Quarantiner{
 		dir: env.Cfg.Acts.Quarantine.Dir,
 	}
 
-	if err := quarantiner.Act(hit); err != nil {
+	if err := acter.Act(hit); err != nil {
 		t.Errorf("quarantine error: %v", err)
+	}
+}
+
+func TestQuarantineDisabled(t *testing.T) {
+	var (
+		input = &Quarantiner{}
+		want  = acter.ErrDisabled
+	)
+
+	if got := input.Load(); !errors.Is(got, want) {
+		t.Errorf("unexpected quarantiner load error %v, want %v", got, want)
+	}
+}
+
+func TestQuarantineNoDir(t *testing.T) {
+	var (
+		input = &Quarantiner{}
+		want  = ErrQuarantineNoDir
+	)
+
+	if err := input.Act(nil); !errors.Is(err, want) {
+		t.Errorf("unexpected quarantine error %v, want %v", err, want)
 	}
 }
 
@@ -151,25 +166,17 @@ func TestQuarantineErrs(t *testing.T) {
 					test.input: meta,
 				})
 
-			quarantiner := Quarantiner{dir: env.Cfg.Acts.Quarantine.Dir}
+			acter := Quarantiner{dir: env.Cfg.Acts.Quarantine.Dir}
 
-			if err := quarantiner.Act(result); err != nil {
+			if err := acter.Act(result); err != nil {
 				t.Fatalf("quarantine error %v", err)
 			}
 
-			errs := result.Errs()
+			err := result.Errs()[0]
 
-			if !errors.Is(errs[0], test.want) {
-				t.Errorf("unexpected quarantine error %v, want %v", errs[0], test.want)
+			if !errors.Is(err, test.want) {
+				t.Errorf("unexpected quarantine error %v, want %v", err, test.want)
 			}
 		})
-	}
-}
-
-func TestActQuarantinePathErrs(t *testing.T) {
-	input := Quarantiner{}
-
-	if err := input.Act(nil); err == nil {
-		t.Errorf("unexpected quarantine act success")
 	}
 }
