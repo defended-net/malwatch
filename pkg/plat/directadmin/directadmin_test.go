@@ -82,7 +82,9 @@ func TestLoad(t *testing.T) {
 			},
 		}
 
-		json.NewEncoder(wr).Encode(data)
+		if err := json.NewEncoder(wr).Encode(data); err != nil {
+			t.Fatalf("json marshal error: %v", err)
+		}
 	}))
 
 	plat.url = serve.URL
@@ -127,7 +129,9 @@ func TestDocRoots(t *testing.T) {
 					},
 				}
 
-				json.NewEncoder(wr).Encode(data)
+				if err := json.NewEncoder(wr).Encode(data); err != nil {
+					t.Fatalf("json marshal error: %v", err)
+				}
 			})),
 
 			want: []string{
@@ -163,7 +167,9 @@ func TestDocRoots(t *testing.T) {
 					},
 				}
 
-				json.NewEncoder(wr).Encode(data)
+				if err := json.NewEncoder(wr).Encode(data); err != nil {
+					t.Fatalf("json marshal error: %v", err)
+				}
 			})),
 
 			want: []string{
@@ -201,7 +207,9 @@ func TestDocRoots(t *testing.T) {
 					},
 				}
 
-				json.NewEncoder(wr).Encode(data)
+				if err := json.NewEncoder(wr).Encode(data); err != nil {
+					t.Fatalf("json marshal error: %v", err)
+				}
 			})),
 
 			want: []string{
@@ -273,7 +281,9 @@ func TestDocRoots(t *testing.T) {
 					},
 				}
 
-				json.NewEncoder(wr).Encode(data)
+				if err := json.NewEncoder(wr).Encode(data); err != nil {
+					t.Fatalf("json marshal error: %v", err)
+				}
 			})),
 
 			want: []string{
@@ -303,7 +313,9 @@ func TestDocRoots(t *testing.T) {
 
 			serve: httptest.NewServer(http.HandlerFunc(func(wr http.ResponseWriter, _ *http.Request) {
 				data := Info{Users: map[string]users{}}
-				json.NewEncoder(wr).Encode(data)
+				if err := json.NewEncoder(wr).Encode(data); err != nil {
+					t.Fatalf("json marshal error: %v", err)
+				}
 			})),
 
 			want: []string{},
