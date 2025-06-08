@@ -11,10 +11,32 @@ import (
 	"github.com/defended-net/malwatch/pkg/scan/state"
 )
 
+func TestLoad(t *testing.T) {
+	var (
+		input = []Acter{
+			Mock(t.Name(), true),
+			Mock(t.Name()+"-disabled", false),
+		}
+
+		want = []Acter{
+			input[0],
+		}
+	)
+
+	got, err := Load(input)
+	if err != nil {
+		t.Fatalf("load error: %s", err)
+	}
+
+	if !reflect.DeepEqual(got, want) {
+		t.Errorf("unexpected load result %v, want %v", got, want)
+	}
+}
+
 func TestGet(t *testing.T) {
 	var (
 		input = t.Name()
-		want  = Mock(t.Name())
+		want  = Mock(t.Name(), true)
 	)
 
 	got, err := Get([]Acter{want}, input)
@@ -34,7 +56,7 @@ func TestGetNoActer(t *testing.T) {
 }
 
 func TestDo(t *testing.T) {
-	input := []Acter{Mock(t.Name())}
+	input := []Acter{Mock(t.Name(), true)}
 
 	if err := Do(input, t.Name(), state.NewResult("fs", state.Paths{})); err != nil {
 		t.Errorf("do error: %s", err)
@@ -43,7 +65,7 @@ func TestDo(t *testing.T) {
 
 func TestDoNoActer(t *testing.T) {
 	var (
-		input = []Acter{Mock(t.Name())}
+		input = []Acter{Mock(t.Name(), true)}
 		want  = ErrVerbUnknown
 	)
 

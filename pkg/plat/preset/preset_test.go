@@ -27,6 +27,8 @@ func TestLoad(t *testing.T) {
 		t.Fatalf("env mock error: %v", err)
 	}
 
+	env.Cfg.Acts.Quarantine.Dir = ""
+
 	env.Plat = New(env)
 
 	if err := env.Plat.Load(); err != nil {
@@ -49,8 +51,12 @@ func TestCfg(t *testing.T) {
 func TestPath(t *testing.T) {
 	var (
 		want = t.TempDir()
-		plat = &Plat{cfg: &Cfg{path: want}}
-		got  = plat.Cfg().Path()
+
+		plat = &Plat{
+			cfg: &Cfg{path: want},
+		}
+
+		got = plat.Cfg().Path()
 	)
 
 	if got != want {
@@ -60,7 +66,7 @@ func TestPath(t *testing.T) {
 
 func TestActers(t *testing.T) {
 	var (
-		input = acter.Mock(act.VerbAlert)
+		input = acter.Mock(act.VerbAlert, true)
 
 		plat = &Plat{
 			acters: []acter.Acter{

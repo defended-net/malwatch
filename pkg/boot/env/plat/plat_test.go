@@ -15,6 +15,8 @@ func TestLoad(t *testing.T) {
 		t.Fatalf("env mock error: %v", err)
 	}
 
+	env.Cfg.Acts.Quarantine.Dir = ""
+
 	if err = Load(env); err != nil {
 		t.Errorf("plat load error: %v", err)
 	}

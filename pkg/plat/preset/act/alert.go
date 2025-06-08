@@ -10,6 +10,7 @@ import (
 
 	"github.com/defended-net/malwatch/pkg/boot/env"
 	"github.com/defended-net/malwatch/pkg/fsys"
+	"github.com/defended-net/malwatch/pkg/plat/acter"
 	"github.com/defended-net/malwatch/pkg/plat/alert"
 	"github.com/defended-net/malwatch/pkg/plat/preset/alert/json"
 	"github.com/defended-net/malwatch/pkg/plat/preset/alert/pagerduty"
@@ -37,41 +38,47 @@ func NewAlerter(env *env.Env) *Alerter {
 }
 
 // Load loads given alerter.
-func (acter *Alerter) Load() error {
+func (alerter *Alerter) Load() error {
 	enabled := []alert.Sender{}
 
-	for _, alerter := range acter.senders {
-		err := fsys.InstallTOML(alerter.Cfg().Path(), alerter.Cfg())
+	for _, sender := range alerter.senders {
+		err := fsys.InstallTOML(sender.Cfg().Path(), sender.Cfg())
 
 		switch {
 		case err == nil:
 			continue
 
 		case errors.Is(err, fs.ErrExist):
-			if err := alerter.Load(); err != nil {
+			err := sender.Load()
+
+			switch {
+			case errors.Is(err, acter.ErrDisabled):
+				continue
+
+			case err != nil:
 				return err
 			}
 
-			enabled = append(enabled, alerter)
+			enabled = append(enabled, sender)
 
 		default:
-			return fmt.Errorf("%w, %v, %v", ErrCfgLoad, err, alerter.Cfg().Path())
+			return fmt.Errorf("%w, %v, %v", ErrCfgLoad, err, sender.Cfg().Path())
 		}
 	}
 
-	if len(enabled) == 0 {
-		return ErrDisabled
-	}
+	alerter.senders = enabled
 
-	acter.senders = enabled
+	if len(enabled) == 0 {
+		return acter.ErrDisabled
+	}
 
 	return nil
 }
 
 // Act sends alerts for given result.
-func (acter *Alerter) Act(result *state.Result) error {
-	for _, alerter := range acter.senders {
-		if err := alerter.Alert(result); err != nil {
+func (alerter *Alerter) Act(result *state.Result) error {
+	for _, sender := range alerter.senders {
+		if err := sender.Alert(result); err != nil {
 			result.AddErr(err)
 		}
 	}
@@ -80,6 +87,6 @@ func (acter *Alerter) Act(result *state.Result) error {
 }
 
 // Verb returns a given alerter verb.
-func (acter *Alerter) Verb() string {
-	return acter.verb
+func (alerter *Alerter) Verb() string {
+	return alerter.verb
 }

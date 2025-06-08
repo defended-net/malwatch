@@ -13,6 +13,7 @@ import (
 	"github.com/defended-net/malwatch/pkg/boot/env"
 	"github.com/defended-net/malwatch/pkg/boot/env/cfg/secret"
 	"github.com/defended-net/malwatch/pkg/client/s3"
+	"github.com/defended-net/malwatch/pkg/plat/acter"
 	"github.com/defended-net/malwatch/pkg/scan/state"
 )
 
@@ -35,6 +36,10 @@ func NewExiler(env *env.Env) *Exiler {
 
 // Load loads a given exiler.
 func (exiler *Exiler) Load() error {
+	if exiler.secrets.Endpoint == "" {
+		return acter.ErrDisabled
+	}
+
 	transport, err := s3.New(exiler.secrets)
 	if err != nil {
 		return err

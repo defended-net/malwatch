@@ -11,7 +11,7 @@ import (
 )
 
 func TestLoad(t *testing.T) {
-	mock := Mock(acter.Mock(t.Name()))
+	mock := Mock(acter.Mock(t.Name(), true))
 
 	if err := mock.Load(); err != nil {
 		t.Errorf("load error: %v", err)
@@ -32,7 +32,7 @@ func TestCfg(t *testing.T) {
 func TestMock(t *testing.T) {
 	var (
 		want = []acter.Acter{
-			acter.Mock(t.Name()),
+			acter.Mock(t.Name(), true),
 		}
 
 		got = Mock(want...)

@@ -123,7 +123,7 @@ func Mock(name string, dir string) (*Env, error) {
 	env := &Env{
 		Opts: &Opts{},
 
-		Plat: plat.Mock(acter.Mock(name)),
+		Plat: plat.Mock(acter.Mock(name, true)),
 
 		Paths: &path.Paths{
 			Install: &path.Install{

@@ -4,6 +4,7 @@
 package act
 
 import (
+	"errors"
 	"os"
 	"path/filepath"
 	"reflect"
@@ -16,29 +17,32 @@ import (
 	"github.com/defended-net/malwatch/pkg/client/s3"
 	"github.com/defended-net/malwatch/pkg/db/orm/hit"
 	"github.com/defended-net/malwatch/pkg/fsys"
+	"github.com/defended-net/malwatch/pkg/plat/acter"
 	"github.com/defended-net/malwatch/pkg/scan/state"
 )
 
 func TestNewExiler(t *testing.T) {
 	env, err := env.Mock(t.Name(), t.TempDir())
 	if err != nil {
-		t.Errorf("env mock error: %s", err)
+		t.Fatalf("env mock error: %s", err)
 	}
 
-	got := NewExiler(env)
+	var (
+		got = NewExiler(env)
 
-	want := &Exiler{
-		verb:          VerbExile,
-		secrets:       env.Cfg.Secrets.S3,
-		quarantineDir: env.Cfg.Acts.Quarantine.Dir,
-	}
+		want = &Exiler{
+			verb:          VerbExile,
+			secrets:       env.Cfg.Secrets.S3,
+			quarantineDir: env.Cfg.Acts.Quarantine.Dir,
+		}
+	)
 
 	if !reflect.DeepEqual(got, want) {
 		t.Errorf("unexpected exiler result %v, want %v", got, want)
 	}
 }
 
-func TestLoadExiler(t *testing.T) {
+func TestExileLoad(t *testing.T) {
 	env, err := env.Mock(t.Name(), t.TempDir())
 	if err != nil {
 		t.Fatalf("env mock error: %s", err)
@@ -51,17 +55,50 @@ func TestLoadExiler(t *testing.T) {
 	}
 }
 
-func TestExileVerb(t *testing.T) {
-	input := &Exiler{
-		verb: VerbExile,
-	}
+func TestExileDisabled(t *testing.T) {
+	var (
+		input = &Exiler{
+			secrets: &secret.S3{},
+		}
 
-	if got := input.Verb(); got != VerbExile {
-		t.Errorf("unexpected verb result %v, want %v", got, VerbExile)
+		want = acter.ErrDisabled
+	)
+
+	if got := input.Load(); !errors.Is(got, want) {
+		t.Errorf("unexpected exiler load error %v, want %v", got, want)
 	}
 }
 
-func TestAct(t *testing.T) {
+func TestExileNoRegion(t *testing.T) {
+	var (
+		input = &Exiler{
+			secrets: &secret.S3{},
+		}
+
+		want = ErrExileNoRegion
+	)
+
+	if err := input.Act(nil); !errors.Is(err, want) {
+		t.Errorf("unexpected exile error %v, want %v", err, want)
+	}
+}
+
+func TestExileVerb(t *testing.T) {
+	var (
+		input = &Exiler{
+			verb: VerbExile,
+		}
+
+		got  = input.Verb()
+		want = VerbExile
+	)
+
+	if got != want {
+		t.Errorf("unexpected verb result %v, want %v", got, want)
+	}
+}
+
+func TestExile(t *testing.T) {
 	env, err := env.Mock(t.Name(), t.TempDir())
 	if err != nil {
 		t.Fatalf("env mock error: %s", err)
@@ -97,7 +134,7 @@ func TestAct(t *testing.T) {
 		t.Fatalf("transport create error: %v", err)
 	}
 
-	exiler := Exiler{
+	exiler := &Exiler{
 		secrets:   env.Cfg.Secrets.S3,
 		transport: transport,
 	}
@@ -111,7 +148,7 @@ func TestAct(t *testing.T) {
 	}
 }
 
-func TestActRemoved(t *testing.T) {
+func TestExileRemoved(t *testing.T) {
 	env, err := env.Mock(t.Name(), t.TempDir())
 	if err != nil {
 		t.Fatalf("env mock error: %s", err)
@@ -148,7 +185,9 @@ func TestActRemoved(t *testing.T) {
 		},
 	)
 
-	exiler := Exiler{secrets: env.Cfg.Secrets.S3}
+	exiler := &Exiler{
+		secrets: env.Cfg.Secrets.S3,
+	}
 
 	if err := exiler.Load(); err != nil {
 		t.Fatalf("exiler load error: %v", err)
@@ -156,15 +195,5 @@ func TestActRemoved(t *testing.T) {
 
 	if err := exiler.Act(hit); err != nil {
 		t.Errorf("exiler error: %v", err)
-	}
-}
-
-func TestActExileErrs(t *testing.T) {
-	input := Exiler{
-		secrets: &secret.S3{},
-	}
-
-	if err := input.Act(nil); err == nil {
-		t.Errorf("unexpected exiler success")
 	}
 }
