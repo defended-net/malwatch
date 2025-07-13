@@ -53,7 +53,7 @@ func New(env *env.Env, paths ...string) (*Scan, error) {
 	scan.addJobs(env, paths)
 
 	for thread := 1; thread <= env.Cfg.Threads; thread++ {
-		worker, err := worker.New(env.Cfg, rules, env.Cfg.Scans.MaxAge)
+		worker, err := worker.New(env.Cfg, rules)
 		if err != nil {
 			return nil, err
 		}

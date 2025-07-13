@@ -31,7 +31,7 @@ func TestNew(t *testing.T) {
 		t.Fatalf("yara load error: %v", err)
 	}
 
-	if _, err := New(env.Cfg, rules, 0); err != nil {
+	if _, err := New(env.Cfg, rules); err != nil {
 		t.Errorf("worker create error: %v", err)
 	}
 }
@@ -124,7 +124,7 @@ func TestMatchesToString(t *testing.T) {
 
 	for name, test := range tests {
 		t.Run(name, func(t *testing.T) {
-			result := MatchesToString(test.input)
+			result := MatchesToStr(test.input)
 
 			if !slices.Equal(result, test.want) {
 				t.Errorf("unexpected matches to string result %v, want %v", result, test.want)
