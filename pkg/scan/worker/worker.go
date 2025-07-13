@@ -30,13 +30,12 @@ import (
 type Worker struct {
 	scanner *yr.Scanner
 	matches yr.MatchRules
-	buff    []byte
 	acts    *act.Cfg
-	blkSz   int
+	buff    []byte
 	exp     time.Time
 	expFn   func(time.Time, string) (bool, *unix.Stat_t)
-	err     error
 	offset  int
+	err     error
 }
 
 // New returns a worker from given cfg, rules and max file age.
@@ -52,7 +51,6 @@ func New(cfg *base.Cfg, rules *yr.Rules) (*Worker, error) {
 		scanner: scanner.SetFlags(yr.ScanFlagsFastMode),
 		buff:    make([]byte, blkSz),
 		acts:    cfg.Acts,
-		blkSz:   blkSz,
 		exp:     time.Now().AddDate(0, 0, -cfg.Scans.MaxAge),
 		expFn:   noop,
 	}
