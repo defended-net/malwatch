@@ -261,19 +261,24 @@ func HasDotDots(paths ...string) error {
 	return nil
 }
 
-// IsExpired verifies is a file has exceeded a max mtime. Includes timestomp protection for ctime.
-func IsExpired(expiry time.Time, path string) (*unix.Stat_t, bool) {
+// IsExp verifies is a file has exceeded max mtime. Timestomp protection with ctime.
+func IsExp(expiry time.Time, path string) (bool, *unix.Stat_t) {
 	stat := &unix.Stat_t{}
 
+	// Error handling can be pushed down for next steps in scan,
+	// such as file opening.
 	if err := unix.Stat(path, stat); err != nil {
-		return stat, true
+		return false, nil
 	}
 
-	cTime, mTime := time.Unix(stat.Ctim.Sec, 0), time.Unix(stat.Mtim.Sec, 0)
+	var (
+		cTime = time.Unix(stat.Ctim.Sec, 0)
+		mTime = time.Unix(stat.Mtim.Sec, 0)
+	)
 
 	if cTime.Before(expiry) && mTime.Before(expiry) {
-		return stat, true
+		return true, nil
 	}
 
-	return stat, false
+	return false, stat
 }

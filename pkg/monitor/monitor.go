@@ -76,7 +76,7 @@ func New(env *env.Env) (*Monitor, error) {
 
 	for thread := 1; thread <= env.Cfg.Threads; thread++ {
 		// File expiration is irrelevant for monitor.
-		worker, err := worker.New(env.Cfg, rules, 0)
+		worker, err := worker.New(env.Cfg, rules)
 		if err != nil {
 			return nil, err
 		}

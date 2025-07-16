@@ -40,7 +40,7 @@ func TestStart(t *testing.T) {
 
 	job := New("target", &Paths{}, 0, 1, []acter.Acter{}, []func(*state.Result) error{}, true)
 
-	worker, err := worker.New(env.Cfg, rules, 0)
+	worker, err := worker.New(env.Cfg, rules)
 	if err != nil {
 		t.Fatalf("worker create error: %v", err)
 	}
@@ -109,7 +109,7 @@ func TestStopNoHit(t *testing.T) {
 		job = New("target", &Paths{}, time.Second, 3, []acter.Acter{}, task, true)
 	)
 
-	worker, err := worker.New(env.Cfg, rules, 0)
+	worker, err := worker.New(env.Cfg, rules)
 	if err != nil {
 		t.Fatalf("worker create error: %v", err)
 	}

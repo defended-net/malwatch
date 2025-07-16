@@ -407,7 +407,7 @@ func TestIsExpired(t *testing.T) {
 		t.Fatalf("file create error: %s", err)
 	}
 
-	if _, result := IsExpired(time.Now().Add(time.Hour*24), input); result != true {
+	if result, _ := IsExp(time.Now().Add(time.Hour*24), input); result != true {
 		t.Errorf("unexpected is expired result %v, want %v", result, true)
 	}
 }
@@ -440,7 +440,7 @@ func TestIsExpiredTimestomp(t *testing.T) {
 				t.Errorf("mtime alert error: %s", err)
 			}
 
-			if _, result := IsExpired(time.Now().Add(-(time.Hour * 24)), path); result != test.want {
+			if result, _ := IsExp(time.Now().Add(-(time.Hour * 24)), path); result != test.want {
 				t.Errorf("unexpected is expired timestomp result %v, want %v", result, test.want)
 			}
 		})
