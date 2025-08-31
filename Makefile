@@ -7,7 +7,7 @@ help:
 	@echo 'Usage:'
 	@sed -n 's/^##//p' ${MAKEFILE_LIST} | column -t -s ':' |  sed -e 's/^/ /'
 
-## audit: verify modules, vet and static check. Then scan for vulnerabilities.
+## audit: verify modules, vet and static check then finish with scan for vulns.
 .PHONY: audit
 audit:
 	go mod verify
@@ -25,7 +25,7 @@ test:
 race:
 	go test -race ./...
 
-## build: compile binary to dir /tmp/malwatch/
+## build: compile bin to dir /tmp/malwatch/
 .PHONY: build
 build:
-	CC=/usr/bin/x86_64-linux-musl-gcc go build -trimpath -ldflags="-w -s -linkmode external -extldflags -static" -o=/tmp/malwatch/ ./cmd/malwatch
+	CC=/usr/bin/x86_64-linux-musl-gcc go build -trimpath -ldflags='-w -s -linkmode external -extldflags "-static -Ithird_party/mimalloc/inc -Lthird_party/mimalloc/lib -lmimalloc"' -o=/tmp/malwatch/ ./cmd/malwatch
