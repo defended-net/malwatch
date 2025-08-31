@@ -7,7 +7,10 @@ builds:
     - CGO_ENABLED=1
     - CC=/usr/bin/x86_64-linux-musl-gcc
   ldflags:
-    - -w -s -linkmode external -extldflags -static -X github.com/defended-net/malwatch/pkg/boot/env.ver={{.Version}}
+    - "-w -s"
+    - "-linkmode external"
+    - "-extldflags '-static -I./third_party/mimalloc/inc -L./third_party/mimalloc/lib -lmimalloc'"
+    - "-X github.com/defended-net/malwatch/pkg/boot/env.ver={{.Version}}"
   flags:
     - -trimpath
   goos:
@@ -21,7 +24,10 @@ builds:
     - CGO_ENABLED=1
     - CC=/usr/bin/x86_64-linux-musl-gcc
   ldflags:
-    - -w -s -linkmode external -extldflags -static -X github.com/defended-net/malwatch/pkg/boot/env.ver={{.Version}}
+    - "-w -s"
+    - "-linkmode external"
+    - "-extldflags '-static -I./third_party/mimalloc/inc -L./third_party/mimalloc/lib -lmimalloc'"
+    - "-X github.com/defended-net/malwatch/pkg/boot/env.ver={{.Version}}"
   flags:
     - -trimpath
   goos:
