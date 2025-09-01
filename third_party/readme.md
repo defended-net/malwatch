@@ -21,3 +21,11 @@ Licence file: yr/COPYING
 [https://github.com/hillu/go-yara](https://github.com/hillu/go-yara)
 
 Licence file: yr/LICENSE
+
+### mimalloc
+
+Compact general purpose memory allocator with excellent performance created by Daan Leijen / Microsoft Research
+
+Licence file: mimalloc/LICENSE
+
+[https://github.com/microsoft/mimalloc](https://github.com/microsoft/mimalloc)
