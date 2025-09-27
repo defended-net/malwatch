@@ -4,11 +4,26 @@
 package main
 
 import (
+	"log/slog"
+	"runtime/debug"
+
 	"github.com/defended-net/malwatch/pkg/cli"
 	"github.com/defended-net/malwatch/pkg/cmd"
 )
 
 func main() {
-	state, err := cli.Run(cmds)
-	defer cmd.Exit(state, err)
+	var (
+		state *cmd.State
+		err   error
+	)
+
+	defer func() {
+		if ok := recover(); ok != nil {
+			slog.Error("panic", "stack", string(debug.Stack()))
+		}
+
+		cmd.Exit(state, err)
+	}()
+
+	state, err = cli.Run(cmds)
 }
