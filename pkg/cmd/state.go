@@ -102,11 +102,8 @@ func Exit(state *State, err error) {
 
 // Lock checks exclusivity to create the lockfile if available.
 func (state *State) Lock(path string) error {
-	state.Lockfile = path
-
 	if _, err := os.Stat(path); err == nil {
-		slog.Error(ErrLockExists.Error(), "path", path)
-		os.Exit(1)
+		return fmt.Errorf("%w, %v", ErrLockExists, path)
 	}
 
 	file, err := os.OpenFile(path, os.O_CREATE|os.O_EXCL|os.O_WRONLY, 0660)
@@ -114,6 +111,8 @@ func (state *State) Lock(path string) error {
 		return fmt.Errorf("%w, %v, %v", ErrLockCreate, err, path)
 	}
 	defer file.Close()
+
+	state.Lockfile = path
 
 	return nil
 }
