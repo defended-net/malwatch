@@ -35,7 +35,7 @@ func Run(sub Sub) (*cmd.State, error) {
 
 	env, err := env.Load(state)
 	if err != nil {
-		return env.State, err
+		return state, err
 	}
 
 	if err := boot.Run(env); err != nil {
