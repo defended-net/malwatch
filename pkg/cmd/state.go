@@ -70,20 +70,30 @@ func NewState() *State {
 
 // Exit exits. The status code is set. All goroutine cancel fns are run for clean exit.
 func Exit(state *State, err error) {
-	defer func() {
-		SetStatus(state, err)
+	defer func(err error) {
+		var code status
 
-		// Listen fn might have already removed the lockfile. Which is fine.
-		if err := os.Remove(state.Lockfile); err != nil && !errors.Is(err, fs.ErrNotExist) {
-			slog.Error(ErrLockDel.Error(), "path", state.Lockfile)
+		if state != nil {
+			SetStatus(state, err)
+
+			for _, cancel := range state.GetCancels() {
+				cancel()
+			}
+
+			// Listen fn might have already removed the lockfile. Which is fine.
+			if state.Lockfile != "" {
+				if err := os.Remove(state.Lockfile); err != nil && !errors.Is(err, fs.ErrNotExist) {
+					slog.Error(ErrLockDel.Error(), "path", state.Lockfile)
+				}
+			}
+
+			code = state.Exit
+		} else {
+			code = getStatus(err)
 		}
 
-		for _, cancel := range state.GetCancels() {
-			cancel()
-		}
-
-		os.Exit(int(state.Exit))
-	}()
+		os.Exit(int(code))
+	}(err)
 
 	if err != nil {
 		slog.Error(err.Error())
