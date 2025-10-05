@@ -6,6 +6,7 @@ package cli
 import (
 	"flag"
 	"fmt"
+	"sort"
 
 	"github.com/defended-net/malwatch/pkg/boot"
 	"github.com/defended-net/malwatch/pkg/boot/env"
@@ -35,7 +36,7 @@ func Run(sub Sub) (*cmd.State, error) {
 
 	env, err := env.Load(state)
 	if err != nil {
-		return env.State, err
+		return state, err
 	}
 
 	if err := boot.Run(env); err != nil {
@@ -102,7 +103,15 @@ func base(sub Sub, args []string) (*Cmd, error) {
 func (sub Sub) Print() error {
 	fmt.Print(help.Logo)
 
-	for arg, cmd := range sub {
+	args := make([]string, 0, len(sub))
+	for arg := range sub {
+		args = append(args, arg)
+	}
+
+	sort.Strings(args)
+
+	for _, arg := range args {
+		cmd := sub[arg]
 		fmt.Print("\n", arg, "\n")
 		fmt.Print(cmd.Help, "\n")
 	}

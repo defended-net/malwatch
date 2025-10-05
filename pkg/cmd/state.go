@@ -70,20 +70,30 @@ func NewState() *State {
 
 // Exit exits. The status code is set. All goroutine cancel fns are run for clean exit.
 func Exit(state *State, err error) {
-	defer func() {
-		SetStatus(state, err)
+	defer func(err error) {
+		var code status
 
-		// Listen fn might have already removed the lockfile. Which is fine.
-		if err := os.Remove(state.Lockfile); err != nil && !errors.Is(err, fs.ErrNotExist) {
-			slog.Error(ErrLockDel.Error(), "path", state.Lockfile)
+		if state != nil {
+			SetStatus(state, err)
+
+			for _, cancel := range state.GetCancels() {
+				cancel()
+			}
+
+			// Listen fn might have already removed the lockfile. Which is fine.
+			if state.Lockfile != "" {
+				if err := os.Remove(state.Lockfile); err != nil && !errors.Is(err, fs.ErrNotExist) {
+					slog.Error(ErrLockDel.Error(), "path", state.Lockfile)
+				}
+			}
+
+			code = state.Exit
+		} else {
+			code = getStatus(err)
 		}
 
-		for _, cancel := range state.GetCancels() {
-			cancel()
-		}
-
-		os.Exit(int(state.Exit))
-	}()
+		os.Exit(int(code))
+	}(err)
 
 	if err != nil {
 		slog.Error(err.Error())
@@ -92,11 +102,8 @@ func Exit(state *State, err error) {
 
 // Lock checks exclusivity to create the lockfile if available.
 func (state *State) Lock(path string) error {
-	state.Lockfile = path
-
 	if _, err := os.Stat(path); err == nil {
-		slog.Error(ErrLockExists.Error(), "path", path)
-		os.Exit(1)
+		return fmt.Errorf("%w, %v", ErrLockExists, path)
 	}
 
 	file, err := os.OpenFile(path, os.O_CREATE|os.O_EXCL|os.O_WRONLY, 0660)
@@ -104,6 +111,8 @@ func (state *State) Lock(path string) error {
 		return fmt.Errorf("%w, %v, %v", ErrLockCreate, err, path)
 	}
 	defer file.Close()
+
+	state.Lockfile = path
 
 	return nil
 }

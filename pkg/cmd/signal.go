@@ -33,17 +33,23 @@ func Listen(state *State) error {
 	signal.Notify(state.Signal, syscall.SIGHUP, syscall.SIGINT, syscall.SIGQUIT, syscall.SIGTERM)
 
 	go func() {
-		signal := <-state.Signal
+		trapped := <-state.Signal
+		signal.Stop(state.Signal)
+
 		state.CancelAll()
 
-		slog.Error(errs[signal].Error())
-
-		// Deferred Exit fn might have already removed the lockfile. Which is fine.
-		if err := os.Remove(state.Lockfile); err != nil && !errors.Is(err, fs.ErrNotExist) {
-			slog.Error(ErrLockDel.Error(), "path", state.Lockfile)
+		if err, ok := errs[trapped]; ok && err != nil {
+			slog.Error(err.Error())
 		}
 
-		os.Exit(int(signals[signal]))
+		// Deferred Exit fn might have already removed the lockfile. Which is fine.
+		if state.Lockfile != "" {
+			if err := os.Remove(state.Lockfile); err != nil && !errors.Is(err, fs.ErrNotExist) {
+				slog.Error(ErrLockDel.Error(), "path", state.Lockfile)
+			}
+		}
+
+		os.Exit(int(signals[trapped]))
 	}()
 
 	return nil
