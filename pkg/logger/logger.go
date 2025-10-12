@@ -33,11 +33,11 @@ func Load(env *env.Env) error {
 	)
 
 	if filepath.IsAbs(path) {
-		if err := os.MkdirAll(dir, 0750); err != nil {
+		if err := os.MkdirAll(dir, 0700); err != nil {
 			return fmt.Errorf("%w, %v, %v", fsys.ErrDirCreate, err, dir)
 		}
 
-		file, err := os.OpenFile(path, os.O_CREATE|os.O_WRONLY|os.O_APPEND, 0660)
+		file, err := os.OpenFile(path, os.O_CREATE|os.O_WRONLY|os.O_APPEND, 0600)
 		if err != nil {
 			return fmt.Errorf("%w, %v, %v", ErrOpen, err, path)
 		}

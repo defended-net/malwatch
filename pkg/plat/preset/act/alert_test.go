@@ -66,7 +66,7 @@ func TestActAlert(t *testing.T) {
 	for _, alerter := range alerter.senders {
 		path := alerter.Cfg().Path()
 
-		if err := os.MkdirAll(filepath.Dir(path), 0755); err != nil {
+		if err := os.MkdirAll(filepath.Dir(path), 0700); err != nil {
 			t.Fatalf("dir create error: %s", err)
 		}
 
@@ -99,7 +99,7 @@ func TestAlerterLoad(t *testing.T) {
 	for _, alerter := range alerter.senders {
 		path := alerter.Cfg().Path()
 
-		if err := os.MkdirAll(filepath.Dir(path), 0755); err != nil {
+		if err := os.MkdirAll(filepath.Dir(path), 0700); err != nil {
 			t.Fatalf("dir create error: %s", err)
 		}
 

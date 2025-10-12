@@ -40,7 +40,7 @@ func TestInstall(t *testing.T) {
 		t.Fatalf("sig mock error: %v", err)
 	}
 
-	if err := os.MkdirAll(env.Paths.Sigs.Tmp, 0750); err != nil {
+	if err := os.MkdirAll(env.Paths.Sigs.Tmp, 0700); err != nil {
 		t.Fatalf("sig dir make error: %v", err)
 	}
 

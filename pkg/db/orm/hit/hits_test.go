@@ -408,7 +408,7 @@ func TestRestore(t *testing.T) {
 		src           = filepath.Join(origDir, t.Name())
 	)
 
-	if err := os.MkdirAll(filepath.Join(quarantineDir, origDir), 0750); err != nil {
+	if err := os.MkdirAll(filepath.Join(quarantineDir, origDir), 0700); err != nil {
 		t.Errorf("quarantine dir create error: %v", err)
 	}
 

@@ -93,7 +93,7 @@ func (update *update) install(_ *secret.Repo) error {
 	for dir, files := range update.srcs {
 		parent := filepath.Join(update.paths.Src, dir)
 
-		if err := os.MkdirAll(parent, 0750); err != nil {
+		if err := os.MkdirAll(parent, 0700); err != nil {
 			return fmt.Errorf("%w, %v, %v", fsys.ErrDirCreate, err, parent)
 		}
 
@@ -153,11 +153,11 @@ func Mock(env *env.Env) error {
 		file = filepath.Join(dir, "mock.yr")
 	)
 
-	if err := os.MkdirAll(dir, 0750); err != nil {
+	if err := os.MkdirAll(dir, 0700); err != nil {
 		return err
 	}
 
-	if err := os.WriteFile(file, []byte(rule), 0640); err != nil {
+	if err := os.WriteFile(file, []byte(rule), 0600); err != nil {
 		return err
 	}
 

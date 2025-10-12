@@ -93,11 +93,11 @@ func Put(db *bbolt.DB, bucket string, key string, obj any) error {
 
 // Mock mocks an orm.
 func Mock(path string) (*bbolt.DB, error) {
-	if err := os.MkdirAll(filepath.Dir(path), 0750); err != nil {
+	if err := os.MkdirAll(filepath.Dir(path), 0700); err != nil {
 		return nil, fmt.Errorf("%w, %v, %v", fsys.ErrDirCreate, err, path)
 	}
 
-	db, err := bbolt.Open(path, 0660, nil)
+	db, err := bbolt.Open(path, 0600, nil)
 	if err != nil {
 		return nil, err
 	}

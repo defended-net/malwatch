@@ -147,7 +147,7 @@ func Mock(paths *path.Paths, dir string) (*Cfg, error) {
 	}
 
 	for _, dir := range dirs {
-		if err := os.MkdirAll(dir, 0750); err != nil {
+		if err := os.MkdirAll(dir, 0700); err != nil {
 			return nil, err
 		}
 	}
