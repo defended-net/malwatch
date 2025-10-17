@@ -395,6 +395,31 @@ func TestExternals(t *testing.T) {
 // TODO: TestCompare
 // TODO: TestComments
 
+func TestModules(t *testing.T) {
+	assertTrueRules(t, []string{
+		"import \"tests\" rule test { condition: tests.constants.one + 1 == tests.constants.two }",
+		"import \"tests\" rule test { condition: tests.constants.foo == \"foo\" }",
+		"import \"tests\" rule test { condition: tests.struct_array[1].i == 1 }",
+		"import \"tests\" rule test { condition: tests.struct_array[0].i == 1 or true}",
+		"import \"tests\" rule test { condition: tests.integer_array[0] == 0}",
+		"import \"tests\" rule test { condition: tests.integer_array[1] == 1}",
+		"import \"tests\" rule test { condition: tests.string_array[0] == \"foo\"}",
+		"import \"tests\" rule test { condition: tests.string_array[2] == \"baz\"}",
+		"import \"tests\" rule test { condition: tests.string_dict[\"foo\"] == \"foo\"}",
+		"import \"tests\" rule test { condition: tests.string_dict[\"bar\"] == \"bar\"}",
+		"import \"tests\" rule test { condition: tests.isum(1,2) == 3}",
+		"import \"tests\" rule test { condition: tests.isum(1,2,3) == 6}",
+		"import \"tests\" rule test { condition: tests.fsum(1.0,2.0) == 3.0}",
+		"import \"tests\" rule test { condition: tests.fsum(1.0,2.0,3.0) == 6.0}",
+		"import \"tests\" rule test { condition: tests.length(\"dummy\") == 5}",
+	}, []byte("dummy"))
+	assertFalseRules(t, []string{
+		"import \"tests\" rule test { condition: tests.struct_array[0].i == 1 }",
+		"import \"tests\" rule test { condition: tests.isum(1,1) == 3}",
+		"import \"tests\" rule test { condition: tests.fsum(1.0,1.0) == 3.0}",
+	}, []byte("dummy"))
+}
+
 func TestIntegerFunctions(t *testing.T) {
 	assertTrueRules(t, []string{
 		"rule test { condition: uint8(0) == 0xAA}",

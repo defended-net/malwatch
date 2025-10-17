@@ -44,8 +44,6 @@ with noyywrap then we can remove this pragma.
 #pragma GCC diagnostic ignored "-Wunused-function"
 #endif
 
-#include <limits.h>
-
 #include <math.h>
 #include <stdarg.h>
 #include <stdio.h>
@@ -897,6 +895,9 @@ int yr_lex_parse_rules_bytes(
 
   compiler->errors = 0;
 
+  if (rules_data == NULL)
+    return 0;
+
   if (yylex_init(&yyscanner) != 0)
   {
     compiler->errors = 1;
@@ -928,6 +929,9 @@ int yr_lex_parse_rules_string(
   yyscan_t yyscanner;
 
   compiler->errors = 0;
+
+  if (rules_string == NULL)
+    return 0;
 
   if (yylex_init(&yyscanner) != 0)
   {
