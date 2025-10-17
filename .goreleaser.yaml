@@ -62,6 +62,9 @@ changelog:
     - title: "Build"
       regexp: '^.*?build(\(.+\))??!?:.+$'
       order: 700
+    - title: "Dependencies"
+      regexp: '^.*?dep(\(.+\))??!?:.+$'
+      order: 800
     - title: Other work
       order: 9999
 
