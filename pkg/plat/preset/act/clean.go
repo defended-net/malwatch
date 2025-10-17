@@ -98,7 +98,7 @@ func (cleaner *Cleaner) clean(path string, meta *hit.Meta) error {
 	}
 	defer src.Close()
 
-	dst, err := os.OpenFile(meta.Status+"-clean", os.O_CREATE|os.O_APPEND|os.O_WRONLY, 0660)
+	dst, err := os.OpenFile(meta.Status+"-clean", os.O_CREATE|os.O_APPEND|os.O_WRONLY, 0600)
 	if err != nil {
 		return fmt.Errorf("%w, %v, %v", fsys.ErrFileOpen, err, meta.Status+"-clean")
 	}

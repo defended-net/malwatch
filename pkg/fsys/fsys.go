@@ -66,7 +66,7 @@ func Mv(srcPath string, dstPath string, attr *Attr) error {
 		return fmt.Errorf("%w, %v", ErrDirMv, src)
 	}
 
-	if err := os.MkdirAll(filepath.Dir(dst), 0750); err != nil {
+	if err := os.MkdirAll(filepath.Dir(dst), 0700); err != nil {
 		return fmt.Errorf("%w, %v, %v", ErrDirCreate, err, dst)
 	}
 
@@ -178,7 +178,7 @@ func ReadTOML(path string, cfg any) error {
 
 // WriteTOML (over)writes a toml file with given cfg.
 func WriteTOML(path string, cfg any) error {
-	file, err := os.OpenFile(path, os.O_WRONLY|os.O_CREATE|os.O_TRUNC, 0660)
+	file, err := os.OpenFile(path, os.O_WRONLY|os.O_CREATE|os.O_TRUNC, 0600)
 	if err != nil {
 		return fmt.Errorf("%w, %v, %v", ErrFileOpen, err, path)
 	}

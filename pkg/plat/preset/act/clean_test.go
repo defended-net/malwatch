@@ -124,7 +124,7 @@ eval(gzinflate(base64_decode('test')));
 
 	path := filepath.Join(t.TempDir(), t.Name())
 
-	if err := os.WriteFile(path, []byte(malware), 0660); err != nil {
+	if err := os.WriteFile(path, []byte(malware), 0600); err != nil {
 		t.Fatalf("file write error: %v", err)
 	}
 

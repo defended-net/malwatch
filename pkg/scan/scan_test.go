@@ -58,7 +58,7 @@ func TestNew(t *testing.T) {
 
 	for name, test := range tests {
 		t.Run(name, func(t *testing.T) {
-			if err := os.WriteFile(path, []byte(test.input), 0660); err != nil {
+			if err := os.WriteFile(path, []byte(test.input), 0600); err != nil {
 				t.Fatalf("file write error: %v", err)
 			}
 

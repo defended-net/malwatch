@@ -10,6 +10,7 @@ import (
 	"errors"
 	"io/ioutil"
 	"os"
+	"runtime"
 	"testing"
 )
 
@@ -153,6 +154,38 @@ func TestScannerIndependence(t *testing.T) {
 
 	t.Logf("Matches 1: %+v", m1)
 	t.Logf("Matches 2: %+v", m2)
+}
+
+func TestScannerImportDataCallback(t *testing.T) {
+	cb := newTestCallback(t)
+	s := makeScanner(t, `
+		import "tests"
+		import "pe"
+		rule t1 { condition: true }
+		rule t2 { condition: false }
+		rule t3 {
+			condition: tests.module_data == "callback-data-for-tests-module"
+		}`)
+	if err := s.SetCallback(cb).ScanMem([]byte("")); err != nil {
+		t.Error(err)
+	}
+	for _, module := range []string{"tests", "pe"} {
+		if _, ok := cb.modules[module]; !ok {
+			t.Errorf("ImportModule was not called for %s", module)
+		}
+	}
+	for _, rule := range []string{"t1", "t3"} {
+		if _, ok := cb.matched["t1"]; !ok {
+			t.Errorf("RuleMatching was not called for %s", rule)
+		}
+	}
+	if _, ok := cb.notMatched["t2"]; !ok {
+		t.Errorf("RuleNotMatching was not called for %s", "t2")
+	}
+	if !cb.finished {
+		t.Errorf("ScanFinished was not called")
+	}
+	runtime.GC()
 }
 
 type failingScanCallback struct{}

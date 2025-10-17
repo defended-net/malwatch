@@ -1,4 +1,5 @@
-//+build !go1.17
+//go:build !go1.15
+// +build !go1.15
 
 // This variant contains a backport of go 1.18's "runtime/cgo".Handle.
 
@@ -30,7 +31,8 @@ func (h cgoHandle) Value() interface{} {
 }
 
 func (h cgoHandle) Delete() {
-	_, ok := handles.LoadAndDelete(uintptr(h))
+	_, ok := handles.Load(uintptr(h))
+	handles.Delete(uintptr(h))
 	if !ok {
 		panic("cgoHandle: misuse of an invalid Handle")
 	}

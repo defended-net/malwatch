@@ -30,7 +30,7 @@ SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 #ifndef YR_UTILS_H
 #define YR_UTILS_H
 
-#include <yr_limits.h>
+#include <limits.h>
 
 #ifndef NULL
 #define NULL 0

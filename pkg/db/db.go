@@ -25,11 +25,11 @@ func Load(env *env.Env) error {
 		return fmt.Errorf("%w, %v", fsys.ErrPathNotAbs, env.Cfg.Database.Dir)
 	}
 
-	if err := os.MkdirAll(env.Cfg.Database.Dir, 0750); err != nil {
+	if err := os.MkdirAll(env.Cfg.Database.Dir, 0700); err != nil {
 		return fmt.Errorf("%w, %v, %v", fsys.ErrDirCreate, err, env.Cfg.Database.Dir)
 	}
 
-	db, err := bbolt.Open(env.Paths.Install.Db, 0660, nil)
+	db, err := bbolt.Open(env.Paths.Install.Db, 0600, nil)
 	if err != nil {
 		return fmt.Errorf("%w, %v", ErrOpen, err)
 	}

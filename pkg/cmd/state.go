@@ -106,7 +106,7 @@ func (state *State) Lock(path string) error {
 		return fmt.Errorf("%w, %v", ErrLockExists, path)
 	}
 
-	file, err := os.OpenFile(path, os.O_CREATE|os.O_EXCL|os.O_WRONLY, 0660)
+	file, err := os.OpenFile(path, os.O_CREATE|os.O_EXCL|os.O_WRONLY, 0600)
 	if err != nil {
 		return fmt.Errorf("%w, %v, %v", ErrLockCreate, err, path)
 	}

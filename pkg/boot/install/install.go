@@ -45,7 +45,7 @@ func Run(env *env.Env) error {
 		env.Paths.Plat.Dir,
 		env.Paths.Install.Tmp,
 	} {
-		if err := os.MkdirAll(dir, 0750); err != nil {
+		if err := os.MkdirAll(dir, 0700); err != nil {
 			return err
 		}
 	}
@@ -132,5 +132,5 @@ ExecStart=` + binPath + ` start
 WantedBy=multi-user.target
 `
 
-	return os.WriteFile(dst, []byte(cfg), 0666)
+	return os.WriteFile(dst, []byte(cfg), 0600)
 }
