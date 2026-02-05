@@ -20,14 +20,20 @@ var (
 	// ErrYrIdxWrite means yr index write error.
 	ErrYrIdxWrite = errors.New("sig: yr index write error")
 
-	// ErrYrRulesLoad means yr load rules error.
-	ErrYrRulesLoad = errors.New("sig: yr load rules error")
+	// ErrYrcLoad means yr load rules error.
+	ErrYrcLoad = errors.New("sig: yr load rules error")
 
-	// ErrYrRulesGet means yr get rules error.
-	ErrYrRulesGet = errors.New("sig: yr get rules error")
+	// ErrYrcGet means yr get rules error.
+	ErrYrcGet = errors.New("sig: yr get rules error")
 
-	// ErrYrRulesSave means yr save rules error.
-	ErrYrRulesSave = errors.New("sig: yr save rules error")
+	// ErrYrcSet means yr set rules error.
+	ErrYrcSet = errors.New("sig: yr set rules error, reverted")
+
+	// ErrYrcSave means yrc save rules error.
+	ErrYrcSave = errors.New("sig: yr save rules error")
+
+	// ErrYrcStat means yrc stat error.
+	ErrYrcStat = errors.New("sig: stat failed, debounced")
 )
 
 // GIT
