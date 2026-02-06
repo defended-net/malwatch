@@ -59,8 +59,8 @@ func TestDo(t *testing.T) {
 
 	env.Cfg.Scans.Paths = []string{dir}
 
-	if err := sig.Refresh(env); err != nil {
-		t.Fatalf("sig refresh error: %s", err)
+	if err := sig.Mock(env, true); err != nil {
+		t.Fatalf("sig mock error: %v", err)
 	}
 
 	if err := db.Load(env); err != nil {
