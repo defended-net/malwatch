@@ -37,8 +37,10 @@ func TestNewErrs(t *testing.T) {
 
 	env.Paths.Sigs.Yrc = ""
 
-	if _, got := New(env); !errors.Is(got, sig.ErrYrRulesLoad) {
-		t.Errorf("unexpected new monitor error: %v, want %v", got, sig.ErrYrRulesLoad)
+	want := sig.ErrYrcGet
+
+	if _, got := New(env); !errors.Is(got, want) {
+		t.Errorf("unexpected new monitor error: %v, want %v", got, want)
 	}
 }
 
@@ -55,7 +57,7 @@ func TestRun(t *testing.T) {
 		t.Fatalf("env mock error: %v", err)
 	}
 
-	if err := sig.Mock(env); err != nil {
+	if err := sig.Mock(env, true); err != nil {
 		t.Fatalf("sig mock error: %v", err)
 	}
 
@@ -87,7 +89,7 @@ func TestRun(t *testing.T) {
 
 		time.Sleep(10 * time.Second)
 
-		env.State.GetCancels()[0]()
+		env.State.CancelAll()
 	}()
 
 	if err := Run(env); !errors.Is(err, context.Canceled) {

@@ -103,6 +103,7 @@ func (job *Job) Start(ctx context.Context, skips *act.Skips, workers ...*worker.
 
 	for _, worker := range workers {
 		job.State.WGrp.Add(1)
+
 		go worker.Work(ctx, job.State, queue)
 	}
 
