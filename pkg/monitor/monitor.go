@@ -23,14 +23,13 @@ import (
 	"github.com/defended-net/malwatch/pkg/scan/worker"
 	"github.com/defended-net/malwatch/pkg/sig"
 	"github.com/defended-net/malwatch/third_party/fan"
-	"github.com/defended-net/malwatch/third_party/yr"
 )
 
 // Monitor represents a monitor.
 type Monitor struct {
+	rev      uint64
 	job      *job.Job
 	notify   *fan.Notify
-	scanner  *yr.Scanner
 	interval time.Duration
 	db       *bbolt.DB
 	workers  []*worker.Worker
@@ -41,16 +40,6 @@ type Monitor struct {
 
 // New returns a monitor from given env.
 func New(env *env.Env) (*Monitor, error) {
-	rules, err := yr.LoadRules(env.Paths.Sigs.Yrc)
-	if err != nil {
-		return nil, fmt.Errorf("%w, %v", sig.ErrYrRulesLoad, err)
-	}
-
-	scanner, err := yr.NewScanner(rules)
-	if err != nil {
-		return nil, fmt.Errorf("%w, %v", sig.ErrYrScanner, err)
-	}
-
 	var (
 		tasks = []func(result *state.Result) error{
 			func(result *state.Result) error { return result.Save(env.Db) },
@@ -62,7 +51,6 @@ func New(env *env.Env) (*Monitor, error) {
 
 	monitor := &Monitor{
 		job:      job,
-		scanner:  scanner,
 		interval: time.Duration(env.Cfg.Scans.Monitor.Timeout) * time.Second,
 		db:       env.Db,
 		skips:    act.GetSkips(env.Cfg.Acts, env.Paths),
@@ -76,7 +64,7 @@ func New(env *env.Env) (*Monitor, error) {
 
 	for thread := 1; thread <= env.Cfg.Threads; thread++ {
 		// File expiration is irrelevant for monitor.
-		worker, err := worker.New(env.Cfg, rules)
+		worker, err := worker.New(env.Cfg)
 		if err != nil {
 			return nil, err
 		}
@@ -89,19 +77,28 @@ func New(env *env.Env) (*Monitor, error) {
 
 // Run starts a monitor while orchestrating timed batches.
 func Run(env *env.Env) error {
-	ctx, cancel := context.WithCancel(context.Background())
-	env.State.AddCancel(cancel)
-
 	monitor, err := New(env)
 	if err != nil {
 		return err
 	}
 
 	var (
-		timer   = time.NewTimer(monitor.interval)
-		hits    []*state.Hit
-		grouped []*state.Result
+		ctx, cancel = context.WithCancel(context.Background())
+		timer       = time.NewTimer(monitor.interval)
+		hits        []*state.Hit
+		grouped     []*state.Result
 	)
+
+	env.State.AddCancel(cancel)
+
+	defer func() {
+		if !timer.Stop() {
+			select {
+			case <-timer.C:
+			default:
+			}
+		}
+	}()
 
 	go monitor.listen(ctx)
 
@@ -113,25 +110,11 @@ func Run(env *env.Env) error {
 	for {
 		select {
 		case <-ctx.Done():
-			// avoid memory leak.
-			if !timer.Stop() {
-				<-timer.C
-			}
-
 			return ctx.Err()
 
 		case <-timer.C:
-			hits = monitor.hits.Get(true)
-			if len(hits) == 0 {
-				timer.Reset(monitor.interval)
-				continue
-			}
-
-			grouped = state.Group("", hits)
-
-			for _, result := range grouped {
-				monitor.job.Acts(result)
-				monitor.job.Tasks(result)
+			if err = monitor.tick(&hits, &grouped); err != nil {
+				return err
 			}
 
 			timer.Reset(monitor.interval)
@@ -250,6 +233,47 @@ func (monitor *Monitor) addPaths(env *env.Env) error {
 			return fmt.Errorf("%w, %v", ErrNotifierMark, err)
 		}
 	}
+
+	return nil
+}
+
+// tick handles periodic batch processing and sig refresh.
+func (monitor *Monitor) tick(hits *[]*state.Hit, grouped *[]*state.Result) error {
+	sigs, err := sig.Acquire()
+	if err != nil {
+		return err
+	}
+	// workers hold own ref.
+	defer sigs.Release()
+
+	if monitor.rev != sigs.Rev {
+		if err := monitor.refresh(sigs.Rev); err != nil {
+			return err
+		}
+	}
+
+	*hits = monitor.hits.Get(true)
+	if len(*hits) == 0 {
+		return nil
+	}
+
+	*grouped = state.Group("", *hits)
+	for _, result := range *grouped {
+		monitor.job.Acts(result)
+		monitor.job.Tasks(result)
+	}
+
+	return nil
+}
+
+func (monitor *Monitor) refresh(rev uint64) error {
+	for _, worker := range monitor.workers {
+		if err := worker.Refresh(); err != nil {
+			return err
+		}
+	}
+
+	monitor.rev = rev
 
 	return nil
 }
