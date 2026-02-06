@@ -84,13 +84,13 @@ func (monitor *monitor) tick() {
 	// debounce
 	time.Sleep(300 * time.Millisecond)
 
+	*monitor.prev = *monitor.cmp
+	monitor.rev.Add(1)
+
 	if err := Set(monitor.path, monitor.rev.Load()); err != nil {
 		slog.Info(ErrYrcSet.Error(), "rev", monitor.rev.Load(), "path", monitor.path, "err", err)
 		return
 	}
-
-	*monitor.prev = *monitor.cmp
-	monitor.rev.Add(1)
 
 	slog.Info("sig: refreshed", "rev", monitor.rev.Load(), "path", monitor.path)
 }

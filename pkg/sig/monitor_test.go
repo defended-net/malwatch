@@ -34,7 +34,7 @@ func TestMonitor(t *testing.T) {
 }
 
 func TestMonitorErrYrcRefresh(t *testing.T) {
-	want := ErrYrcSet
+	want := ErrYrcStat
 
 	env, err := env.Mock(t.Name(), t.TempDir())
 	if err != nil {
@@ -167,7 +167,7 @@ func TestMonitorRevAtomic(t *testing.T) {
 
 func TestMonitorRevConcurrent(t *testing.T) {
 	var (
-		want  = 1000
+		want  = uint64(1000)
 		got   uint64
 		input = &monitor{}
 		done  = make(chan struct{})
@@ -181,13 +181,13 @@ func TestMonitorRevConcurrent(t *testing.T) {
 		}
 	}()
 
-	for range want - 1 {
-		got = input.rev.Load()
+	for range want {
+		input.rev.Load()
 	}
 
 	<-done
 
-	if got = input.rev.Load(); got != 1000 {
+	if got = input.rev.Load(); got != want {
 		t.Errorf("unexpected rev %v, want %v", got, want)
 	}
 }
