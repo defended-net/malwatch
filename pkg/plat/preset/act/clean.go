@@ -54,7 +54,7 @@ func (cleaner *Cleaner) Load() error {
 
 	rules, err := yr.LoadRules(cleaner.rules)
 	if err != nil {
-		return fmt.Errorf("%w, %v", sig.ErrYrRulesGet, err)
+		return fmt.Errorf("%w, %v", sig.ErrYrcGet, err)
 	}
 
 	cleaner.scanner, err = yr.NewScanner(rules)
