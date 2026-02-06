@@ -22,16 +22,11 @@ func TestNew(t *testing.T) {
 		t.Fatalf("env mock error: %v", err)
 	}
 
-	if err := sig.Mock(env); err != nil {
+	if err := sig.Mock(env, true); err != nil {
 		t.Fatalf("sig mock error: %v", err)
 	}
 
-	rules, err := yr.LoadRules(env.Paths.Sigs.Yrc)
-	if err != nil {
-		t.Fatalf("yara load error: %v", err)
-	}
-
-	if _, err := New(env.Cfg, rules); err != nil {
+	if _, err := New(env.Cfg); err != nil {
 		t.Errorf("worker create error: %v", err)
 	}
 }
