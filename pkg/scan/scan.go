@@ -21,12 +21,12 @@ import (
 	"github.com/defended-net/malwatch/pkg/scan/state"
 	"github.com/defended-net/malwatch/pkg/scan/worker"
 	"github.com/defended-net/malwatch/pkg/sig"
-	"github.com/defended-net/malwatch/third_party/yr"
 )
 
 // Scan represents a scan.
 type Scan struct {
 	opts    *env.Opts
+	rev     uint64
 	jobs    []*job.Job
 	workers []*worker.Worker
 	skips   *act.Skips
@@ -37,11 +37,6 @@ type Scan struct {
 
 // New returns a scan for given env and paths.
 func New(env *env.Env, paths ...string) (*Scan, error) {
-	rules, err := yr.LoadRules(env.Paths.Sigs.Yrc)
-	if err != nil {
-		return nil, fmt.Errorf("%w, %v, %v", sig.ErrYrRulesLoad, err, env.Paths.Sigs.Yrc)
-	}
-
 	scan := &Scan{
 		opts:    env.Opts,
 		cancel:  env.State.Cancel,
@@ -53,7 +48,7 @@ func New(env *env.Env, paths ...string) (*Scan, error) {
 	scan.addJobs(env, paths)
 
 	for thread := 1; thread <= env.Cfg.Threads; thread++ {
-		worker, err := worker.New(env.Cfg, rules)
+		worker, err := worker.New(env.Cfg)
 		if err != nil {
 			return nil, err
 		}
@@ -88,9 +83,34 @@ func (scan *Scan) Run() error {
 		ctx, cancel := context.WithTimeout(context.Background(), scan.timeout)
 		scan.cancel.Add(cancel)
 
+		sigs, err := sig.Acquire()
+		if err != nil {
+			return err
+		}
+		// workers hold own ref.
+		defer sigs.Release()
+
+		if scan.rev != sigs.Rev {
+			if err := scan.refresh(sigs.Rev); err != nil {
+				return err
+			}
+		}
+
 		job.Start(ctx, scan.skips, scan.workers...)
 		job.Stop()
 	}
+
+	return nil
+}
+
+func (scan *Scan) refresh(rev uint64) error {
+	for _, worker := range scan.workers {
+		if err := worker.Refresh(); err != nil {
+			return err
+		}
+	}
+
+	scan.rev = rev
 
 	return nil
 }

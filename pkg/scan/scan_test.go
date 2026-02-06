@@ -29,7 +29,7 @@ func TestNew(t *testing.T) {
 		t.Fatalf("env mock error: %v", err)
 	}
 
-	if err := sig.Mock(env); err != nil {
+	if err := sig.Mock(env, true); err != nil {
 		t.Fatalf("sig mock error: %v", err)
 	}
 
