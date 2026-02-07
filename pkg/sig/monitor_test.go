@@ -1,5 +1,5 @@
-// © Roscoe Skeens <rskeens@defended. net>
-// SPDX-License-Identifier:  AGPL-3.0-or-later
+// © Roscoe Skeens <rskeens@defended.net>
+// SPDX-License-Identifier: AGPL-3.0-or-later
 
 package sig
 
