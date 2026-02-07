@@ -17,7 +17,7 @@ func TestDo(t *testing.T) {
 		t.Errorf("env mock error: %v", err)
 	}
 
-	if err := sig.Mock(env); err != nil {
+	if err := sig.Mock(env, true); err != nil {
 		t.Errorf("sigs mock error: %v", err)
 	}
 

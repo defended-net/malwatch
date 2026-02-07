@@ -10,7 +10,7 @@ import (
 	"github.com/defended-net/malwatch/pkg/db/orm/hit"
 )
 
-// Hit represents a hit detection.
+// Hit represents a hit.
 type Hit struct {
 	Path string
 	Meta *hit.Meta
@@ -39,7 +39,8 @@ func Group(target string, hits []*Hit) []*Result {
 
 				Paths{
 					hit.Path: hit.Meta,
-				})
+				},
+			)
 
 			continue
 		}

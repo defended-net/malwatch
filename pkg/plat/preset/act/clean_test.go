@@ -66,7 +66,7 @@ func TestCleanLoad(t *testing.T) {
 		t.Fatalf("env mock error: %s", err)
 	}
 
-	if err := sig.Mock(env); err != nil {
+	if err := sig.Mock(env, true); err != nil {
 		t.Fatalf("sig mock error: %s", err)
 	}
 
@@ -104,7 +104,7 @@ func TestCleanInject(t *testing.T) {
 		t.Fatalf("env mock error: %s", err)
 	}
 
-	if err := sig.Mock(env); err != nil {
+	if err := sig.Mock(env, true); err != nil {
 		t.Fatalf("sig mock error: %v", err)
 	}
 
@@ -156,7 +156,7 @@ func TestCleanInjectMultiLine(t *testing.T) {
 		t.Fatalf("env mock error: %s", err)
 	}
 
-	if err := sig.Mock(env); err != nil {
+	if err := sig.Mock(env, true); err != nil {
 		t.Fatalf("sig mock error: %s", err)
 	}
 

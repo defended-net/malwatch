@@ -20,7 +20,6 @@ import (
 	"github.com/defended-net/malwatch/pkg/scan/state"
 	"github.com/defended-net/malwatch/pkg/scan/worker"
 	"github.com/defended-net/malwatch/pkg/sig"
-	"github.com/defended-net/malwatch/third_party/yr"
 )
 
 func TestStart(t *testing.T) {
@@ -29,18 +28,13 @@ func TestStart(t *testing.T) {
 		t.Fatalf("env mock error: %v", err)
 	}
 
-	if err := sig.Mock(env); err != nil {
+	if err := sig.Mock(env, true); err != nil {
 		t.Fatalf("sig mock error: %v", err)
-	}
-
-	rules, err := yr.LoadRules(env.Paths.Sigs.Yrc)
-	if err != nil {
-		t.Fatalf("yara load error: %v", err)
 	}
 
 	job := New("target", &Paths{}, 0, 1, []acter.Acter{}, []func(*state.Result) error{}, true)
 
-	worker, err := worker.New(env.Cfg, rules)
+	worker, err := worker.New(env.Cfg)
 	if err != nil {
 		t.Fatalf("worker create error: %v", err)
 	}
@@ -87,13 +81,8 @@ func TestStopNoHit(t *testing.T) {
 		t.Fatalf("env mock error: %v", err)
 	}
 
-	if err := sig.Mock(env); err != nil {
+	if err := sig.Mock(env, true); err != nil {
 		t.Fatalf("sig mock error: %v", err)
-	}
-
-	rules, err := yr.LoadRules(env.Paths.Sigs.Yrc)
-	if err != nil {
-		t.Fatalf("yara load error: %v", err)
 	}
 
 	var (
@@ -109,7 +98,7 @@ func TestStopNoHit(t *testing.T) {
 		job = New("target", &Paths{}, time.Second, 3, []acter.Acter{}, task, true)
 	)
 
-	worker, err := worker.New(env.Cfg, rules)
+	worker, err := worker.New(env.Cfg)
 	if err != nil {
 		t.Fatalf("worker create error: %v", err)
 	}

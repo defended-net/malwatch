@@ -21,7 +21,7 @@ func TestUpdate(t *testing.T) {
 		t.Fatalf("env mock error: %v", err)
 	}
 
-	if err := Mock(env); err != nil {
+	if err := Mock(env, true); err != nil {
 		t.Fatalf("sig mock error: %v", err)
 	}
 
@@ -36,7 +36,7 @@ func TestInstall(t *testing.T) {
 		t.Fatalf("env mock error: %v", err)
 	}
 
-	if err := Mock(env); err != nil {
+	if err := Mock(env, true); err != nil {
 		t.Fatalf("sig mock error: %v", err)
 	}
 
@@ -145,7 +145,7 @@ func TestMock(t *testing.T) {
 		t.Fatalf("env mock error: %v", err)
 	}
 
-	if err := Mock(env); err != nil {
+	if err := Mock(env, true); err != nil {
 		t.Errorf("sig mock error: %v", err)
 	}
 }

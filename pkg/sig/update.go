@@ -146,7 +146,7 @@ func (update *update) walk(path string) error {
 }
 
 // Mock mocks sigs.
-func Mock(env *env.Env) error {
+func Mock(env *env.Env, monitor bool) error {
 	var (
 		rule = `rule eicar : tag { strings: $s1 = "$EICAR-STANDARD-ANTIVIRUS-TEST-FILE!" condition: $s1 }`
 		dir  = filepath.Join(env.Paths.Sigs.Src, "mock")
@@ -161,5 +161,13 @@ func Mock(env *env.Env) error {
 		return err
 	}
 
-	return Refresh(env)
+	if err := Refresh(env); err != nil {
+		return err
+	}
+
+	if monitor {
+		return Monitor(env)
+	}
+
+	return nil
 }

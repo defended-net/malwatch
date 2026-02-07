@@ -84,13 +84,13 @@ func (update *update) compile() error {
 
 	rules, err := yr.GetRules()
 	if err != nil {
-		return fmt.Errorf("%w, %v", ErrYrRulesGet, err)
+		return fmt.Errorf("%w, %v", ErrYrcGet, err)
 	}
 
 	slog.Info("saving rules", "path", update.paths.Yrc)
 
 	if err = rules.Save(update.paths.Yrc); err != nil {
-		return fmt.Errorf("%w, %v", ErrYrRulesSave, err)
+		return fmt.Errorf("%w, %v", ErrYrcSave, err)
 	}
 
 	if err := os.Chmod(update.paths.Yrc, 0600); err != nil {

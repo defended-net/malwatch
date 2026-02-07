@@ -15,12 +15,14 @@ import (
 	"github.com/defended-net/malwatch/pkg/cmd"
 	"github.com/defended-net/malwatch/pkg/db"
 	"github.com/defended-net/malwatch/pkg/logger"
+	"github.com/defended-net/malwatch/pkg/sig"
 )
 
 var tasks = []func(*env.Env) error{
 	install.Run,
 	cfg.Load,
 	logger.Load,
+	sig.Monitor,
 	db.Load,
 	plat.Load,
 }
