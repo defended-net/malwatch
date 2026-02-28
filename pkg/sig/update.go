@@ -26,7 +26,7 @@ type update struct {
 
 // Report represents a sig update report.
 type Report struct {
-	Update interface{}
+	Update any
 }
 
 // Update starts a sig update.
@@ -59,9 +59,21 @@ func Update(env *env.Env) error {
 // clone clones repo.
 func (update *update) clone(repo *secret.Repo) error {
 	var (
-		owner, _ = filepath.Base(filepath.Dir(repo.URL)), filepath.Base(repo.URL)
-		dst      = filepath.Join(update.paths.Tmp, owner)
+		owner = filepath.Base(filepath.Dir(repo.URL))
+		dst   = filepath.Join(update.paths.Tmp, owner)
 	)
+
+	if owner == "" || owner == "." || owner == "/" {
+		return ErrNoRepoOwner
+	}
+
+	if err := fsys.HasDotDots(dst); err != nil {
+		return err
+	}
+
+	if !fsys.IsRel(dst, update.paths.Tmp) {
+		return fmt.Errorf("%w, %v", fsys.ErrPathTravers, dst)
+	}
 
 	switch {
 	case dst == "":
@@ -73,7 +85,15 @@ func (update *update) clone(repo *secret.Repo) error {
 
 	dot := filepath.Join(dst, ".git")
 
-	// No error for not exist.
+	if err := fsys.HasDotDots(dot); err != nil {
+		return err
+	}
+
+	if !fsys.IsRel(dot, update.paths.Tmp) {
+		return fmt.Errorf("%w, %v", fsys.ErrPathTravers, dot)
+	}
+
+	// No err for not exist.
 	if err := os.RemoveAll(dot); err != nil {
 		return fmt.Errorf("%w, %v", fsys.ErrFileDel, dot)
 	}
@@ -90,31 +110,49 @@ func (update *update) clone(repo *secret.Repo) error {
 
 // install installs downloaded repo yr src files.
 func (update *update) install(_ *secret.Repo) error {
+	attr := &fsys.Attr{
+		UID:  os.Getuid(),
+		GID:  os.Getgid(),
+		Mode: 0600,
+	}
+
 	for dir, files := range update.srcs {
 		parent := filepath.Join(update.paths.Src, dir)
+
+		// Validate parent against path traversal.
+		if err := fsys.HasDotDots(parent); err != nil {
+			return err
+		}
+
+		// Verify install dir is within the expected src dir.
+		if !fsys.IsRel(parent, update.paths.Src) {
+			return fmt.Errorf("%w, %v", fsys.ErrPathTravers, parent)
+		}
 
 		if err := os.MkdirAll(parent, 0700); err != nil {
 			return fmt.Errorf("%w, %v, %v", fsys.ErrDirCreate, err, parent)
 		}
 
 		for _, file := range files {
-			path := filepath.Join(update.paths.Tmp, file)
+			var (
+				src = filepath.Join(update.paths.Tmp, file)
+				dst = filepath.Join(update.paths.Src, dir, filepath.Base(file))
+			)
 
-			stat, err := os.Lstat(path)
-			if err != nil {
-				return fmt.Errorf("%w, %v", fsys.ErrStat, path)
+			if err := fsys.HasDotDots(src, dst); err != nil {
+				return err
 			}
 
-			// symlinks not allowed.
-			if stat.Mode()&os.ModeSymlink != 0 {
-				slog.Info(ErrIsSym.Error(), "path", path)
-				continue
+			switch {
+			case !fsys.IsRel(src, update.paths.Tmp):
+				return fmt.Errorf("%w, %v", fsys.ErrPathTravers, src)
+
+			case !fsys.IsRel(dst, update.paths.Src):
+				return fmt.Errorf("%w, %v", fsys.ErrPathTravers, dst)
 			}
 
-			dst := filepath.Join(update.paths.Src, dir, filepath.Base(file))
-
-			if err := os.Rename(path, dst); err != nil {
-				return fmt.Errorf("%w, %v, %v, %v", fsys.ErrFileCopy, err, file, dst)
+			if err := fsys.Mv(src, dst, attr); err != nil {
+				return fmt.Errorf("%w, %v, %v", fsys.ErrFileCopy, err, dst)
 			}
 		}
 	}
@@ -126,6 +164,8 @@ func (update *update) install(_ *secret.Repo) error {
 func (update *update) walk(path string) error {
 	reduced := map[string][]string{}
 
+	path = strings.TrimRight(filepath.Clean(path), "/") + "/"
+
 	srcs, err := fsys.WalkByExt(path, ".yara", ".yar", ".yr")
 	if err != nil {
 		return fmt.Errorf("%w, %v, %v", fsys.ErrWalk, err, path)
@@ -133,11 +173,16 @@ func (update *update) walk(path string) error {
 
 	for _, src := range srcs {
 		var (
-			rel  = strings.TrimPrefix(src, path)
-			base = filepath.Dir(rel)
+			parent = strings.TrimPrefix(src, path)
+			dir    = filepath.Dir(parent)
 		)
 
-		reduced[base] = append(reduced[base], rel)
+		if strings.Contains(parent, "..") {
+			slog.Info(fsys.ErrPathTravers.Error(), "path", src)
+			continue
+		}
+
+		reduced[dir] = append(reduced[dir], parent)
 	}
 
 	update.srcs = reduced
