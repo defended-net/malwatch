@@ -4,20 +4,17 @@
 package fsys
 
 import (
-	"errors"
 	"fmt"
 	"io"
 	"io/fs"
 	"log/slog"
 	"os"
 	"path/filepath"
-	"strconv"
+	"slices"
 	"strings"
 	"time"
 
 	"golang.org/x/sys/unix"
-
-	"github.com/BurntSushi/toml"
 )
 
 // Attr represents file attributes.
@@ -35,62 +32,86 @@ func NewAttr(stat *unix.Stat_t) *Attr {
 		UID:   int(stat.Uid),
 		GID:   int(stat.Gid),
 		Mode:  fs.FileMode(stat.Mode).Perm(),
-		CTime: time.Unix(stat.Ctim.Sec, 0).UTC(),
-		MTime: time.Unix(stat.Mtim.Sec, 0).UTC(),
+		CTime: time.Unix(stat.Ctim.Sec, stat.Ctim.Nsec).UTC(),
+		MTime: time.Unix(stat.Mtim.Sec, stat.Ctim.Nsec).UTC(),
 	}
 }
 
 // Mv moves files across different mnts. uid and gid only apply for files.
 func Mv(srcPath string, dstPath string, attr *Attr) error {
 	var (
-		src = filepath.Clean(srcPath)
-		dst = filepath.Clean(dstPath)
+		src  = filepath.Clean(srcPath)
+		dst  = filepath.Clean(dstPath)
+		stat = &unix.Stat_t{}
 	)
+
+	if attr == nil {
+		return fmt.Errorf("%w, %v", ErrAttrInvalid, src)
+	}
 
 	if err := HasDotDots(src, dst); err != nil {
 		return err
 	}
 
-	srcF, err := os.Open(src)
-	if err != nil {
-		return fmt.Errorf("%w, %v, %v", ErrFileOpen, err, src)
-	}
-	defer srcF.Close()
-
-	stat, err := srcF.Stat()
-	if err != nil {
+	if err := unix.Lstat(src, stat); err != nil {
 		return fmt.Errorf("%w, %v, %v", ErrStat, err, src)
 	}
 
-	if stat.IsDir() {
-		return fmt.Errorf("%w, %v", ErrDirMv, src)
+	switch stat.Mode & unix.S_IFMT {
+	// Regular file, proceed.
+	case unix.S_IFREG:
+
+	// Reject symlink.
+	case unix.S_IFLNK:
+		return fmt.Errorf("%w, %v", ErrIsSym, src)
+
+	// Reject dir.
+	case unix.S_IFDIR:
+		return fmt.Errorf("%w, %v", ErrIsDir, src)
+
+	default:
+		return fmt.Errorf("%w, %v", ErrIsNotReg, src)
 	}
 
-	if err := os.MkdirAll(filepath.Dir(dst), 0700); err != nil {
-		return fmt.Errorf("%w, %v, %v", ErrDirCreate, err, dst)
+	if err := func() error {
+		srcF, err := os.Open(src)
+		if err != nil {
+			return fmt.Errorf("%w, %v, %v", ErrFileOpen, err, src)
+		}
+		defer srcF.Close()
+
+		if err := os.MkdirAll(filepath.Dir(dst), 0700); err != nil {
+			return fmt.Errorf("%w, %v, %v", ErrDirCreate, err, dst)
+		}
+
+		dstF, err := os.OpenFile(dst, os.O_WRONLY|os.O_CREATE|os.O_TRUNC, attr.Mode)
+		if err != nil {
+			return fmt.Errorf("%w, %v, %v", ErrFileCreate, err, dst)
+		}
+		defer dstF.Close()
+
+		if _, err = io.Copy(dstF, srcF); err != nil {
+			return fmt.Errorf("%w, %v, %v, %v", ErrFileCopy, err, src, dst)
+		}
+
+		if err := os.Chown(dst, attr.UID, attr.GID); err != nil {
+			// Might be unpriv user, which is fine.s
+			slog.Info(ErrChown.Error(), "path", dst)
+		}
+
+		if err = os.Chmod(dst, attr.Mode); err != nil {
+			slog.Info(ErrChmod.Error(), "path", dst)
+		}
+
+		if err := dstF.Sync(); err != nil {
+			return fmt.Errorf("%w, %v", ErrFileSync, dst)
+		}
+
+		return nil
+	}(); err != nil {
+		return err
 	}
 
-	dstF, err := os.Create(dst)
-	if err != nil {
-		return fmt.Errorf("%w, %v, %v", ErrFileCreate, err, dst)
-	}
-	defer dstF.Close()
-
-	// Replicate file.
-	if _, err = io.Copy(dstF, srcF); err != nil {
-		return fmt.Errorf("%w, %v, %v, %v", ErrFileCopy, err, src, dst)
-	}
-
-	if err := os.Chown(dst, attr.UID, attr.GID); err != nil {
-		// Do not return, it might be running as ordinary user.
-		slog.Info(ErrChown.Error(), "path", dst)
-	}
-
-	if err = os.Chmod(dst, attr.Mode); err != nil {
-		slog.Info(ErrChmod.Error(), "path", dst)
-	}
-
-	// Delete src file.
 	if err := os.Remove(src); err != nil {
 		return fmt.Errorf("%w, %v, %v", ErrFileDel, err, src)
 	}
@@ -131,110 +152,58 @@ func WalkByExt(path string, exts ...string) ([]string, error) {
 	}
 
 	for _, path := range paths {
-		for _, ext := range exts {
-			if filepath.Ext(path) == ext {
-				result = append(result, path)
-				break
-			}
+		if slices.Contains(exts, filepath.Ext(path)) {
+			result = append(result, path)
 		}
 	}
 
 	return result, nil
 }
 
-// InstallTOML installs a toml file by first checking if a matching .toml file exists and if not,
-// will write the file but with file extension .disabled.
-func InstallTOML(path string, cfg any) error {
-	// .toml exists, abort.
-	if _, err := toml.DecodeFile(path, cfg); err == nil {
-		// Should not be logged.
-		return fs.ErrExist
-	} else if !errors.Is(err, fs.ErrNotExist) {
-		return fmt.Errorf("%w, %v, %v", ErrTOMLRead, err, path)
-	}
-
-	disabled := strings.Replace(path, ".toml", ".disabled", 1)
-
-	// .disabled exists, abort.
-	if _, err := os.Stat(disabled); err == nil {
-		return nil
-	}
-
-	if err := WriteTOML(disabled, cfg); err != nil {
-		return fmt.Errorf("%w, %v, %v", ErrTOMLWrite, err, disabled)
-	}
-
-	return nil
-}
-
-// ReadTOML reads a toml file for given cfg.
-func ReadTOML(path string, cfg any) error {
-	if _, err := toml.DecodeFile(path, cfg); err != nil {
-		return fmt.Errorf("%w, %v, %v", ErrTOMLRead, err, path)
-	}
-
-	return nil
-}
-
-// WriteTOML (over)writes a toml file with given cfg.
-func WriteTOML(path string, cfg any) error {
-	file, err := os.OpenFile(path, os.O_WRONLY|os.O_CREATE|os.O_TRUNC, 0600)
-	if err != nil {
-		return fmt.Errorf("%w, %v, %v", ErrFileOpen, err, path)
-	}
-	defer file.Close()
-
-	if err := toml.NewEncoder(file).Encode(cfg); err != nil {
-		return fmt.Errorf("%w, %v, %v", ErrTOMLWrite, err, path)
-	}
-
-	return nil
-}
-
 // QuarantinePath returns a path's quarantine path from given parent dir and detection path.
 func QuarantinePath(quarantineDir string, path string) string {
-	srcD, srcF := filepath.Split(path)
+	var (
+		dir, file = filepath.Split(path)
+		renamed   = fmt.Sprintf("%s-%d", file, time.Now().Unix())
+	)
 
-	return filepath.Join(quarantineDir, srcD, srcF+"-"+strconv.FormatInt(time.Now().Unix(), 10))
+	return filepath.Join(quarantineDir, dir, renamed)
 }
 
 // MntPoint returns a given path's mnt point.
 func MntPoint(path string) (string, error) {
-	stat := &unix.Stat_t{}
+	cur := &unix.Stat_t{}
 
-	if err := unix.Stat(path, stat); err != nil {
+	if err := unix.Stat(path, cur); err != nil {
 		return "", fmt.Errorf("%w, %v, %v", ErrStat, err, path)
 	}
 
-	for {
-		if path == "/" {
-			return "/", nil
-		}
-
+	for path != "/" {
 		var (
-			parent     = filepath.Dir(path)
-			parentStat = &unix.Stat_t{}
+			parent = filepath.Dir(path)
+			stat   = &unix.Stat_t{}
 		)
 
-		if err := unix.Stat(path, stat); err != nil {
-			return "", fmt.Errorf("%w, %v, %v", ErrStat, err, path)
+		if err := unix.Stat(parent, stat); err != nil {
+			return "", fmt.Errorf("%w, %v, %v", ErrStat, err, parent)
 		}
 
-		if parentStat.Dev != stat.Dev {
-			break
+		if stat.Dev != cur.Dev {
+			return path, nil
 		}
 
 		path = parent
-		stat = parentStat
+		cur = stat
 	}
 
-	return path, nil
+	return "/", nil
 }
 
 // IsRel verifies if a path is relative to a base path.
 func IsRel(path string, bases ...string) bool {
 	for _, base := range bases {
 		rel, err := filepath.Rel(base, path)
+
 		if err == nil && !strings.HasPrefix(rel, "../") && rel != ".." {
 			return true
 		}
@@ -246,14 +215,18 @@ func IsRel(path string, bases ...string) bool {
 // HasDotDots validates paths against dot dots, relative, root or current dir.
 func HasDotDots(paths ...string) error {
 	for _, path := range paths {
-		path = filepath.Clean(path)
+		// Check segments before collapse.
+		if slices.Contains(strings.Split(filepath.ToSlash(path), "/"), "..") {
+			return fmt.Errorf("%w, %v", ErrPathTravers, path)
+		}
 
-		// filepath.Clean will transform to shortest path, which can still be abused.
-		if !filepath.IsAbs(path) {
+		clean := filepath.Clean(path)
+
+		if !filepath.IsAbs(clean) {
 			return fmt.Errorf("%w, %v", ErrPathNotAbs, path)
 		}
 
-		if path == "/" {
+		if clean == "/" {
 			return fmt.Errorf("%w, %v", ErrPathRoot, path)
 		}
 	}
@@ -262,12 +235,10 @@ func HasDotDots(paths ...string) error {
 }
 
 // IsExp verifies is a file has exceeded max mtime. Timestomp protection with ctime.
-func IsExp(expiry time.Time, path string) (bool, *unix.Stat_t) {
+func IsExp(expiry time.Time, fd int) (bool, *unix.Stat_t) {
 	stat := &unix.Stat_t{}
 
-	// Error handling can be pushed down for next steps in scan,
-	// such as file opening.
-	if err := unix.Stat(path, stat); err != nil {
+	if err := unix.Fstat(fd, stat); err != nil {
 		return false, nil
 	}
 
