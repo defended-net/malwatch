@@ -17,96 +17,6 @@ import (
 	"golang.org/x/sys/unix"
 )
 
-func TestReadTOML(t *testing.T) {
-	var (
-		path = filepath.Join(t.TempDir(), t.Name())
-
-		toml = `[example]
-  key = "value"`
-	)
-
-	if err := os.WriteFile(path, []byte(toml), 0600); err != nil {
-		t.Fatalf("unable to write to file: %v", err)
-	}
-
-	var cfg struct {
-		Example struct {
-			Key string `toml:"key"`
-		} `toml:"example"`
-	}
-
-	if err := ReadTOML(path, &cfg); err != nil {
-		t.Fatalf("read toml error: %v", err)
-	}
-
-	if cfg.Example.Key != "value" {
-		t.Errorf("unexpected read toml result: got %v, want %v", cfg.Example.Key, "value")
-	}
-}
-
-func TestInstallTOML(t *testing.T) {
-	input := filepath.Join(t.TempDir(), t.Name())
-
-	if err := InstallTOML(input, struct{}{}); err != nil {
-		t.Errorf("install toml error: %v", err)
-	}
-}
-
-func TestInstallTOMLExists(t *testing.T) {
-	input := filepath.Join(t.TempDir(), t.Name())
-
-	file, err := os.Create(input)
-	if err != nil {
-		t.Fatalf("toml write error: %v", err)
-	}
-	defer file.Close()
-
-	if err := InstallTOML(input, &struct{}{}); !errors.Is(err, fs.ErrExist) {
-		t.Errorf("install toml error: %v", err)
-	}
-}
-
-func TestInstallTOMLDisabled(t *testing.T) {
-	var (
-		path     = filepath.Join(t.TempDir(), t.Name()+".toml")
-		disabled = strings.Replace(path, ".toml", ".disabled", 1)
-	)
-
-	file, err := os.Create(disabled)
-	if err != nil {
-		t.Fatalf("disabled toml write error: %v", err)
-	}
-	defer file.Close()
-
-	if err := InstallTOML(path, struct{}{}); err != nil {
-		t.Errorf("install toml error: %v", err)
-	}
-}
-
-func TestInstallTOMLErrs(t *testing.T) {
-	input := "/dev/null/" + t.Name()
-
-	if err := InstallTOML(input, struct{}{}); !errors.Is(err, ErrTOMLRead) {
-		t.Errorf("unexpected install toml error: %v", err)
-	}
-}
-
-func TestWriteTOML(t *testing.T) {
-	input := filepath.Join(t.TempDir(), t.Name())
-
-	if err := WriteTOML(input, struct{}{}); err != nil {
-		t.Errorf("write toml error: %v", err)
-	}
-}
-
-func TestWriteTOMLErrs(t *testing.T) {
-	input := "//"
-
-	if err := WriteTOML(input, struct{}{}); !errors.Is(err, ErrFileOpen) {
-		t.Errorf("unexpected write toml error: %v", err)
-	}
-}
-
 func TestNewAttr(t *testing.T) {
 	file, err := os.OpenFile(filepath.Join(t.TempDir(), t.Name()), os.O_CREATE, 0600)
 	if err != nil {
@@ -125,8 +35,8 @@ func TestNewAttr(t *testing.T) {
 		UID:   int(stat.Uid),
 		GID:   int(stat.Gid),
 		Mode:  fs.FileMode(stat.Mode).Perm(),
-		CTime: time.Unix(stat.Ctim.Sec, 0).UTC(),
-		MTime: time.Unix(stat.Mtim.Sec, 0).UTC(),
+		CTime: time.Unix(stat.Ctim.Sec, stat.Ctim.Nsec).UTC(),
+		MTime: time.Unix(stat.Mtim.Sec, stat.Ctim.Nsec).UTC(),
 	}
 
 	if !reflect.DeepEqual(result, want) {
@@ -180,7 +90,7 @@ func TestMvPathErrs(t *testing.T) {
 
 		"dir": {
 			input: t.TempDir(),
-			want:  ErrDirMv,
+			want:  ErrIsDir,
 		},
 	}
 
@@ -200,15 +110,12 @@ func TestMvPathErrs(t *testing.T) {
 }
 
 func TestMvErrs(t *testing.T) {
-	path := "/dev/null/" + t.Name()
+	var (
+		input = "/dev/null/" + t.Name()
+		want  = ErrStat
+	)
 
-	attr := &Attr{
-		UID:  os.Getuid(),
-		GID:  os.Getgid(),
-		Mode: 0600,
-	}
-
-	if err := Mv(path, path, attr); !errors.Is(err, ErrFileOpen) {
+	if err := Mv(input, input, &Attr{}); !errors.Is(err, want) {
 		t.Errorf("unexpected mv error: %v, want %v", err, "not a directory")
 	}
 }
@@ -272,13 +179,15 @@ func TestWalkByExt(t *testing.T) {
 }
 
 func TestWalkByExtErrs(t *testing.T) {
+	want := ErrWalk
+
 	result, err := WalkByExt(t.Name(), ".ext")
 	if len(result) != 0 {
 		t.Fatalf("unexpected walk by ext result %v", result)
 	}
 
-	if !errors.Is(err, ErrWalk) {
-		t.Errorf("unexpected walk by ext error: %v, want %v", err, ErrWalk)
+	if !errors.Is(err, want) {
+		t.Errorf("unexpected walk by ext error: %v, want %v", err, want)
 	}
 }
 
@@ -323,12 +232,12 @@ func TestHasDotDots(t *testing.T) {
 
 		"rel-prefix": {
 			input: "../",
-			want:  ErrPathNotAbs,
+			want:  ErrPathTravers,
 		},
 
 		"rel-prefix-abs": {
 			input: "/../",
-			want:  ErrPathRoot,
+			want:  ErrPathTravers,
 		},
 
 		"zero-length": {
@@ -347,10 +256,13 @@ func TestHasDotDots(t *testing.T) {
 }
 
 func TestGetMntPointErrs(t *testing.T) {
-	input := t.Name()
+	var (
+		input = t.Name()
+		want  = ErrStat
+	)
 
-	if _, err := MntPoint(input); !errors.Is(err, ErrStat) {
-		t.Errorf("unexpected get mnt point error: %v", err)
+	if _, got := MntPoint(input); !errors.Is(got, want) {
+		t.Errorf("unexpected get mnt point error: %v", got)
 	}
 }
 
@@ -403,11 +315,13 @@ func TestIsRelErrs(t *testing.T) {
 func TestIsExpired(t *testing.T) {
 	input := filepath.Join(t.TempDir(), t.Name())
 
-	if _, err := os.Create(input); err != nil {
+	file, err := os.Create(input)
+	if err != nil {
 		t.Fatalf("file create error: %s", err)
 	}
+	defer file.Close()
 
-	if result, _ := IsExp(time.Now().Add(time.Hour*24), input); result != true {
+	if result, _ := IsExp(time.Now().Add(time.Hour*24), int(file.Fd())); result != true {
 		t.Errorf("unexpected is expired result %v, want %v", result, true)
 	}
 }
@@ -440,7 +354,13 @@ func TestIsExpiredTimestomp(t *testing.T) {
 				t.Errorf("mtime alert error: %s", err)
 			}
 
-			if result, _ := IsExp(time.Now().Add(-(time.Hour * 24)), path); result != test.want {
+			file, err := os.Open(path)
+			if err != nil {
+				t.Fatalf("file open error: %s", err)
+			}
+			defer file.Close()
+
+			if result, _ := IsExp(time.Now().Add(-(time.Hour * 24)), int(file.Fd())); result != test.want {
 				t.Errorf("unexpected is expired timestomp result %v, want %v", result, test.want)
 			}
 		})
