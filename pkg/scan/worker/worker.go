@@ -34,7 +34,7 @@ type Worker struct {
 	acts    *act.Cfg
 	buff    []byte
 	exp     time.Time
-	expFn   func(time.Time, string) (bool, *unix.Stat_t)
+	expFn   func(time.Time, int) (bool, *unix.Stat_t)
 }
 
 // New returns a worker from given cfg, rules and max file age.
@@ -76,7 +76,14 @@ func (worker *Worker) Work(ctx context.Context, state *state.Job, queue chan str
 
 // Scan scans given file path and job state. Results and errs to job state.
 func (worker *Worker) Scan(path string, result *state.Job) {
-	exp, stat := worker.expFn(worker.exp, path)
+	file, err := os.Open(path)
+	if err != nil {
+		result.AddErr(fmt.Errorf("%w, %v, %v", ErrFileRead, err, path))
+		return
+	}
+	defer file.Close()
+
+	exp, stat := worker.expFn(worker.exp, int(file.Fd()))
 	if exp {
 		return
 	}
@@ -84,16 +91,7 @@ func (worker *Worker) Scan(path string, result *state.Job) {
 	var (
 		scanner = worker.scanner.Load()
 		offset  int
-		err     error
 	)
-
-	// Attempt to open the file even if stat failed.
-	file, err := os.Open(path)
-	if err != nil {
-		result.AddErr(fmt.Errorf("%w, %v, %v", ErrFileRead, err, path))
-		return
-	}
-	defer file.Close()
 
 out:
 	for {
@@ -123,7 +121,7 @@ out:
 	if stat == nil {
 		stat = &unix.Stat_t{}
 
-		if err := unix.Stat(path, stat); err != nil {
+		if err := unix.Fstat(int(file.Fd()), stat); err != nil {
 			result.AddErr(fmt.Errorf("%w, %v, %v", fsys.ErrStat, err, path))
 		}
 	}
@@ -186,7 +184,7 @@ func MatchesToStr(matches yr.MatchRules) []string {
 	return slices.Compact(rules)
 }
 
-func noop(_ time.Time, _ string) (bool, *unix.Stat_t) {
+func noop(_ time.Time, _ int) (bool, *unix.Stat_t) {
 	return false, nil
 }
 
