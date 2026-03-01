@@ -214,7 +214,7 @@ func TestHasValidPaths(t *testing.T) {
 	}{
 		"not-abs": {
 			input: "../path",
-			want:  fsys.ErrPathNotAbs,
+			want:  fsys.ErrPathTravers,
 		},
 
 		"root-path": {
@@ -403,23 +403,23 @@ func TestSelectLastHitErrs(t *testing.T) {
 
 func TestRestore(t *testing.T) {
 	var (
-		origDir       = t.TempDir()
+		srcDir        = t.TempDir()
+		srcPath       = filepath.Join(srcDir, t.Name())
 		quarantineDir = t.TempDir()
-		src           = filepath.Join(origDir, t.Name())
 	)
 
-	if err := os.MkdirAll(filepath.Join(quarantineDir, origDir), 0700); err != nil {
+	if err := os.MkdirAll(filepath.Join(quarantineDir, srcDir), 0700); err != nil {
 		t.Errorf("quarantine dir create error: %v", err)
 	}
 
-	dst, err := os.Create(filepath.Join(quarantineDir, origDir, t.Name()+"-quarantined"))
+	dst, err := os.Create(filepath.Join(quarantineDir, srcDir, t.Name()+"-quarantined"))
 	if err != nil {
 		t.Errorf("file create error: %v", err)
 	}
 
 	hit := &History{
 		Paths: Paths{
-			src: {
+			srcPath: {
 				{
 					Status: filepath.Base(dst.Name()),
 
@@ -432,7 +432,7 @@ func TestRestore(t *testing.T) {
 		},
 	}
 
-	if err := hit.Paths[src][0].Restore(quarantineDir, src); err != nil {
+	if err := hit.Paths[srcPath][0].Restore(quarantineDir, srcPath); err != nil {
 		t.Errorf("restore error: %v", err)
 	}
 }
@@ -443,7 +443,7 @@ func TestRestoreErrs(t *testing.T) {
 		Attr:   &fsys.Attr{},
 	}
 
-	if err := input.Restore("../", filepath.Join(t.TempDir(), "../")); !errors.Is(err, fsys.ErrPathNotAbs) {
+	if err := input.Restore("../", filepath.Join(t.TempDir(), "../")); !errors.Is(err, fsys.ErrPathTravers) {
 		t.Errorf("restore error: %v", err)
 	}
 }

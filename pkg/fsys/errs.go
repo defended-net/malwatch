@@ -18,6 +18,9 @@ var (
 
 	// ErrFileDel means file del error.
 	ErrFileDel = errors.New("fsys: file del error")
+
+	// ErrFileSync means file sync error.
+	ErrFileSync = errors.New("fsys: file sync error")
 )
 
 // DIR
@@ -27,9 +30,6 @@ var (
 
 	// ErrDirCreate means dir create error.
 	ErrDirCreate = errors.New("fsys: dir create error")
-
-	// ErrDirMv means dir move attempt.
-	ErrDirMv = errors.New("fsys: only files permitted for move")
 )
 
 // MODE
@@ -42,6 +42,18 @@ var (
 
 	// ErrChown means chown error.
 	ErrChown = errors.New("fsys: chown error")
+
+	// ErrIsSym means is symlink.
+	ErrIsSym = errors.New("fsys: is symlink")
+
+	// ErrIsDir means is dir.
+	ErrIsDir = errors.New("fsys: is dir")
+
+	// ErrIsNotReg is not regular.
+	ErrIsNotReg = errors.New("fsys: not regular file")
+
+	// ErrAttrInvalid means invalid attr.
+	ErrAttrInvalid = errors.New("fsys: invalid attr")
 )
 
 // VALIDATION
@@ -54,6 +66,9 @@ var (
 
 	// ErrPathNotAbs means path not absolute.
 	ErrPathNotAbs = errors.New("fsys: path not absolute")
+
+	// ErrPathTravers means path travers.
+	ErrPathTravers = errors.New("fsys: path travers")
 )
 
 // TOML
