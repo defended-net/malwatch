@@ -5,24 +5,25 @@ package tui
 
 import (
 	"fmt"
+	"sync"
+	"sync/atomic"
 	"time"
 )
 
 // Spinner represents a progress spinner.
 type Spinner struct {
-	tick     *time.Ticker
-	interval time.Duration
 	msg      string
-	stop     chan (struct{})
+	interval time.Duration
+	running  atomic.Bool
+	once     sync.Once
+	done     sync.WaitGroup
 }
 
 // NewSpinner returns a spinner from given interval and message.
 func NewSpinner(interval time.Duration, msg string) *Spinner {
 	return &Spinner{
-		tick:     time.NewTicker(interval),
 		interval: interval,
 		msg:      msg,
-		stop:     make(chan struct{}, 1),
 	}
 }
 
@@ -32,33 +33,27 @@ func (spinner *Spinner) Start() {
 		return
 	}
 
-	defer close(spinner.stop)
-	defer spinner.Stop()
+	spinner.running.Store(true)
 
-	tick := []string{
-		"-",
-		"\\",
-		"|",
-		"/",
+	spinner.done.Add(1)
+	defer spinner.done.Done()
+
+	var (
+		ticker = time.NewTicker(spinner.interval)
+		idx    = 0
+		tick   = []string{"-", "\\", "|", "/"}
+	)
+
+	defer ticker.Stop()
+
+	for spinner.running.Load() {
+		<-ticker.C
+
+		fmt.Printf("\r%v [%v]", spinner.msg, tick[idx])
+		idx = (idx + 1) % len(tick)
 	}
 
-	idx := 0
-
-	for {
-		select {
-		case <-spinner.stop:
-			return
-
-		case <-spinner.tick.C:
-			fmt.Printf("\r%v [%v]", spinner.msg, tick[idx])
-
-			idx++
-
-			if idx > 3 {
-				idx = 0
-			}
-		}
-	}
+	fmt.Printf("\r\033[2K")
 }
 
 // Stop stops a spinner.
@@ -67,10 +62,8 @@ func (spinner *Spinner) Stop() {
 		return
 	}
 
-	spinner.tick.Stop()
-	spinner.stop <- struct{}{}
-
-	// Clear.
-	fmt.Printf("\r")
-	fmt.Printf("\033[2K")
+	spinner.once.Do(func() {
+		spinner.running.Store(false)
+		spinner.done.Wait()
+	})
 }
