@@ -18,13 +18,13 @@ func YesNo(msg string, reader io.Reader) bool {
 	scanner := bufio.NewScanner(reader)
 
 	for scanner.Scan() {
-		input := strings.ToLower(scanner.Text())
+		input := strings.ToLower(strings.TrimSpace(scanner.Text()))
 
 		switch input {
-		case "y":
+		case "y", "yes":
 			return true
 
-		case "n":
+		case "n", "no":
 			return false
 		}
 

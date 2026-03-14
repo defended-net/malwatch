@@ -22,7 +22,7 @@ import (
 	"github.com/defended-net/malwatch/pkg/tui"
 )
 
-// Job represents a scan job. Each target can have exactly one job.
+// Job represents scan job. Each target can have exactly one job.
 type Job struct {
 	Target  string
 	State   *state.Job
@@ -41,7 +41,7 @@ type Paths struct {
 	Dirs  []string
 }
 
-// New returns a new job.
+// New returns new job.
 func New(target string, paths *Paths, timeout time.Duration, batchSz int, acters []acter.Acter, tasks []func(*state.Result) error, ticker bool) *Job {
 	job := &Job{
 		Target:  target,
@@ -60,9 +60,9 @@ func New(target string, paths *Paths, timeout time.Duration, batchSz int, acters
 	return job
 }
 
-// Walk traverses paths.
+// Walk traverses paths for given job.
 // File counting done here in single thread to avoid lock contention from workers handling it.
-func (job *Job) Walk(skips *act.Skips, sz int) chan string {
+func (job *Job) Walk(skips *act.Skips, sz int) <-chan string {
 	queue := make(chan string, sz)
 
 	go func() {
@@ -96,7 +96,7 @@ func (job *Job) Walk(skips *act.Skips, sz int) chan string {
 	return queue
 }
 
-// Start starts a job.
+// Start starts given job.
 func (job *Job) Start(ctx context.Context, skips *act.Skips, workers ...*worker.Worker) {
 	go job.spinner.Start()
 	queue := job.Walk(skips, job.batchSz)
@@ -115,43 +115,39 @@ func (job *Job) Start(ctx context.Context, skips *act.Skips, workers ...*worker.
 	}()
 }
 
-// Stop stops a job.
+// Stop stops given job by flushing hits.
 func (job *Job) Stop() {
-	var (
-		idx  int
-		hits = []*state.Hit{}
-	)
+	hits := make([]*state.Hit, 0, job.batchSz)
 
 	for hit := range job.State.Hits {
-		idx++
 		hits = append(hits, hit)
 
-		if idx > job.batchSz {
-			grouped := state.Group(job.Target, hits)
-
-			for _, result := range grouped {
-				job.Acts(result)
-				job.Tasks(result)
-			}
-
-			hits = nil
-			idx = 0
+		if len(hits) >= job.batchSz {
+			job.flush(hits)
+			hits = hits[:0]
 		}
 	}
 
-	grouped := state.Group(job.Target, hits)
-
-	for _, result := range grouped {
-		job.Acts(result)
-		job.Tasks(result)
-	}
+	job.flush(hits)
 
 	for _, err := range job.State.Errs() {
 		slog.Error(err.Error())
 	}
 }
 
-// Acts performs actions with a given result.
+// flush first performs acts and then tasks for given hits.
+func (job *Job) flush(hits []*state.Hit) {
+	if len(hits) == 0 {
+		return
+	}
+
+	for _, result := range state.Group(job.Target, hits) {
+		job.Acts(result)
+		job.Tasks(result)
+	}
+}
+
+// Acts performs acts for given result.
 func (job *Job) Acts(result *state.Result) {
 	for _, acter := range job.acters {
 		filtered := FilterAct(result, acter.Verb())
@@ -166,7 +162,7 @@ func (job *Job) Acts(result *state.Result) {
 	}
 }
 
-// Tasks performs tasks with a given result.
+// Tasks performs tasks for given result.
 func (job *Job) Tasks(result *state.Result) {
 	for _, task := range job.tasks {
 		if err := task(result); err != nil {
@@ -175,7 +171,7 @@ func (job *Job) Tasks(result *state.Result) {
 	}
 }
 
-// FilterAct returns grouped hits from given act verb.
+// FilterAct returns grouped hits for given act verb.
 func FilterAct(result *state.Result, verb string) *state.Result {
 	filtered := state.NewResult(result.Target, state.Paths{})
 

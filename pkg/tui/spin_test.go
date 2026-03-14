@@ -38,7 +38,7 @@ func TestStart(t *testing.T) {
 func TestStartNil(t *testing.T) {
 	defer func() {
 		if err := recover(); err != nil {
-			t.Fatalf("unexpected panic during nil spinner start")
+			t.Fatalf("unexpected nil spinner start panic")
 		}
 	}()
 

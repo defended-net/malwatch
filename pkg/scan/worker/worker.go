@@ -60,7 +60,7 @@ func New(cfg *base.Cfg) (*Worker, error) {
 }
 
 // Work receives given queued paths to scan.
-func (worker *Worker) Work(ctx context.Context, state *state.Job, queue chan string) {
+func (worker *Worker) Work(ctx context.Context, state *state.Job, queue <-chan string) {
 	defer state.WGrp.Done()
 
 	for path := range queue {

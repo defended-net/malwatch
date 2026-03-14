@@ -107,10 +107,10 @@ func TestStopNoHit(t *testing.T) {
 
 	job.Stop()
 
-	if _, err := os.Stat(path); err != nil {
-		if os.IsNotExist(err) {
-			t.Errorf("task flag file not found: %v", path)
-		}
+	if _, err := os.Stat(path); err == nil {
+		t.Errorf("task flag file should not exist: %v", path)
+	} else if !os.IsNotExist(err) {
+		t.Fatalf("stat error: %v", err)
 	}
 }
 
