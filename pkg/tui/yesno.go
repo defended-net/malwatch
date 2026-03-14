@@ -15,13 +15,10 @@ import (
 func YesNo(msg string, reader io.Reader) bool {
 	fmt.Printf("%s [y/n] ", msg)
 
-	var (
-		scanner = bufio.NewScanner(reader)
-		input   = ""
-	)
+	scanner := bufio.NewScanner(reader)
 
 	for scanner.Scan() {
-		input = strings.ToLower(strings.TrimSpace(scanner.Text()))
+		input := strings.ToLower(strings.TrimSpace(scanner.Text()))
 
 		switch input {
 		case "y", "yes":
