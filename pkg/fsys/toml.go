@@ -8,6 +8,7 @@ import (
 	"fmt"
 	"io/fs"
 	"os"
+	"path/filepath"
 	"strings"
 
 	"github.com/BurntSushi/toml"
@@ -15,45 +16,102 @@ import (
 
 // InstallTOML installs toml file. Checks for existing .toml file.
 // If not exist, then write file but with ext .disabled.
-func InstallTOML(path string, cfg any) error {
+func InstallTOML(root *os.Root, name string, cfg any) error {
+	if root == nil {
+		return ErrPathRoot
+	}
+
+	name, err := RootName(root, name)
+	if err != nil {
+		return err
+	}
+
+	path := filepath.Join(root.Name(), name)
+
 	// .toml exists, abort.
-	if _, err := toml.DecodeFile(path, cfg); err == nil {
+	file, err := root.Open(name)
+	if err == nil {
+		defer Close(file)
+
+		if _, err := toml.NewDecoder(file).Decode(cfg); err != nil {
+			return fmt.Errorf("%w, %v, %v", ErrTOMLRead, err, path)
+		}
+
 		// Should not be logged.
 		return fs.ErrExist
 	} else if !errors.Is(err, fs.ErrNotExist) {
 		return fmt.Errorf("%w, %v, %v", ErrTOMLRead, err, path)
 	}
 
-	disabled := strings.TrimSuffix(path, ".toml") + ".disabled"
+	disabled := strings.TrimSuffix(name, ".toml") + ".disabled"
 
-	// .disabled exists, abort.
-	if _, err := os.Stat(disabled); err == nil {
-		return nil
+	if !filepath.IsLocal(disabled) {
+		return fmt.Errorf("%w, %v", ErrPathLocal, filepath.Join(root.Name(), disabled))
 	}
 
-	return WriteTOML(disabled, cfg)
+	out, err := root.OpenFile(disabled, os.O_WRONLY|os.O_CREATE|os.O_EXCL, 0600)
+	if errors.Is(err, fs.ErrExist) {
+		return nil
+	} else if err != nil {
+		return fmt.Errorf("%w, %v, %v", ErrFileOpen, err, filepath.Join(root.Name(), disabled))
+	}
+	defer Close(out)
+
+	if err := toml.NewEncoder(out).Encode(cfg); err != nil {
+		return fmt.Errorf("%w, %v, %v", ErrTOMLWrite, err, filepath.Join(root.Name(), disabled))
+	}
+
+	return nil
 }
 
-// ReadTOML reads toml file for given cfg.
-func ReadTOML(path string, cfg any) error {
-	if _, err := toml.DecodeFile(path, cfg); err != nil {
+// ReadTOML reads toml file for given cfg through root.
+func ReadTOML(root *os.Root, name string, cfg any) error {
+	if root == nil {
+		return ErrPathRoot
+	}
+
+	name, err := RootName(root, name)
+	if err != nil {
+		return err
+	}
+
+	path := filepath.Join(root.Name(), name)
+
+	file, err := root.Open(name)
+	if err != nil {
+		return fmt.Errorf("%w, %v, %v", ErrTOMLRead, err, path)
+	}
+	defer Close(file)
+
+	if _, err := toml.NewDecoder(file).Decode(cfg); err != nil {
 		return fmt.Errorf("%w, %v, %v", ErrTOMLRead, err, path)
 	}
 
 	return nil
 }
 
-// WriteTOML (over)writes toml file with given cfg.
-func WriteTOML(path string, cfg any) error {
-	file, err := os.OpenFile(path, os.O_WRONLY|os.O_CREATE|os.O_TRUNC, 0600)
+// WriteTOML overwrites toml file with given cfg.
+func WriteTOML(root *os.Root, name string, cfg any) error {
+	if root == nil {
+		return ErrPathRoot
+	}
+
+	name, err := RootName(root, name)
+	if err != nil {
+		return err
+	}
+
+	path := filepath.Join(root.Name(), name)
+
+	file, err := root.OpenFile(name, os.O_WRONLY|os.O_CREATE|os.O_TRUNC, 0600)
 	if err != nil {
 		return fmt.Errorf("%w, %v, %v", ErrFileOpen, err, path)
 	}
-	defer file.Close()
+	defer Close(file)
 
 	if err := toml.NewEncoder(file).Encode(cfg); err != nil {
 		return fmt.Errorf("%w, %v, %v", ErrTOMLWrite, err, path)
 	}
 
-	return nil
+	return err
 }

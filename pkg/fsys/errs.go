@@ -10,6 +10,12 @@ var (
 	// ErrFileOpen means file open error.
 	ErrFileOpen = errors.New("fsys: file open error")
 
+	// ErrFileStat means file stat error.
+	ErrFileStat = errors.New("fsys: file stat error")
+
+	// ErrFileClose means file close error.
+	ErrFileClose = errors.New("fsys: file close error")
+
 	// ErrFileCreate means file create error.
 	ErrFileCreate = errors.New("fsys: file create error")
 
@@ -49,6 +55,9 @@ var (
 	// ErrIsDir means is dir.
 	ErrIsDir = errors.New("fsys: is dir")
 
+	// ErrIsNotDir means is not dir.
+	ErrIsNotDir = errors.New("fsys: is not dir")
+
 	// ErrIsNotReg is not regular.
 	ErrIsNotReg = errors.New("fsys: not regular file")
 
@@ -58,17 +67,29 @@ var (
 
 // VALIDATION
 var (
+	// ErrPathMissing means path does not exist.
+	ErrPathMissing = errors.New("fsys: path missing")
+
 	// ErrPathInvalid means invalid path format.
 	ErrPathInvalid = errors.New("fsys: invalid path format")
 
 	// ErrPathRoot means root path not permitted.
 	ErrPathRoot = errors.New("fsys: root path not permitted")
 
+	// ErrPathLocal
+	ErrPathLocal = errors.New("fsys: not local")
+
 	// ErrPathNotAbs means path not absolute.
 	ErrPathNotAbs = errors.New("fsys: path not absolute")
 
-	// ErrPathTravers means path travers.
-	ErrPathTravers = errors.New("fsys: path travers")
+	// ErrPathTraverse means path traverse.
+	ErrPathTraverse = errors.New("fsys: path traverse")
+
+	// ErrFlagOpen means invalid open flag combination
+	ErrFlagOpen = errors.New("fsys: invalid open flag combination")
+
+	// ErrPerms means perm bits are invalid / disallowed.
+	ErrPerms = errors.New("fsys: invalid perms")
 )
 
 // TOML
