@@ -27,6 +27,7 @@ type Cfg struct {
 // Alerts represents alerts.
 type Alerts struct {
 	JSON      *JSON
+	Slack     *Slack
 	PagerDuty *PagerDuty
 	SMTP      *SMTP
 }
@@ -35,6 +36,11 @@ type Alerts struct {
 type JSON struct {
 	User string `env:"JSON_USER"`
 	Pass string `env:"JSON_PASS"`
+}
+
+// Slack represents slack.
+type Slack struct {
+	Webhook string `env:"SLACK_WEBHOOK"`
 }
 
 // PagerDuty represents pagerduty.
@@ -79,6 +85,7 @@ func New(path string) *Cfg {
 
 		Alerts: &Alerts{
 			JSON:      &JSON{},
+			Slack:     &Slack{},
 			PagerDuty: &PagerDuty{},
 			SMTP:      &SMTP{},
 		},
@@ -90,8 +97,8 @@ func New(path string) *Cfg {
 }
 
 // Load reads the cfg from toml path.
-func (cfg *Cfg) Load() error {
-	if err := fsys.ReadTOML(cfg.Path(), cfg); err != nil {
+func (cfg *Cfg) Load(root *os.Root) error {
+	if err := fsys.ReadTOML(root, cfg.Path(), cfg); err != nil {
 		return err
 	}
 
@@ -119,6 +126,7 @@ func Mock(path string) (*Cfg, error) {
 
 		Alerts: &Alerts{
 			JSON:      &JSON{},
+			Slack:     &Slack{},
 			PagerDuty: &PagerDuty{},
 			SMTP:      &SMTP{},
 		},
@@ -128,7 +136,10 @@ func Mock(path string) (*Cfg, error) {
 			Key:      "",
 		},
 
-		S3: &S3{},
+		S3: &S3{
+			Endpoint: "localhost:9000",
+			Region:   "us-east-1",
+		},
 
 		Git: []*Repo{
 			{
@@ -142,7 +153,8 @@ func Mock(path string) (*Cfg, error) {
 	}
 
 	for idx, repo := range cfg.Git {
-		if repo.Token == "" {
+		if strings.TrimSuffix(repo.URL, "/") != "https://github.com/defended-net/malwatch-signatures" &&
+			repo.Token == "" {
 			repo.User = os.Getenv("GIT_" + fmt.Sprint(idx) + "_USER")
 			repo.Token = os.Getenv("GIT_" + fmt.Sprint(idx) + "_TOKEN")
 			repo.URL = os.Getenv("GIT_" + fmt.Sprint(idx) + "_URL")

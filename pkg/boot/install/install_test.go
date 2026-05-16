@@ -4,7 +4,6 @@
 package install
 
 import (
-	"errors"
 	"fmt"
 	"os"
 	"os/exec"
@@ -28,13 +27,13 @@ func TestRunYesNo(t *testing.T) {
 		},
 	}
 
-	env, err := env.Mock(t.Name(), t.TempDir())
-	if err != nil {
-		t.Fatalf("env mock error: %v", err)
-	}
-
 	for name, test := range tests {
 		t.Run(name, func(t *testing.T) {
+			env, err := env.Mock(t.Name(), t.TempDir())
+			if err != nil {
+				t.Fatalf("env mock error %v", err)
+			}
+
 			env.Paths.Cfg.Base += name
 
 			rd, wr, err := os.Pipe()
@@ -51,10 +50,12 @@ func TestRunYesNo(t *testing.T) {
 			if _, err = wr.WriteString(test.input); err != nil {
 				t.Fatal(err)
 			}
-			wr.Close()
 
-			if err = Run(env); err != nil {
-				t.Errorf("run error: %v", err)
+			// lint
+			_ = wr.Close()
+
+			if got := Run(env); got != nil {
+				t.Errorf("run error %v", got)
 			}
 		})
 	}
@@ -75,7 +76,7 @@ func TestRunYesNoExit(t *testing.T) {
 
 	env, err := env.Mock(t.Name(), t.TempDir())
 	if err != nil {
-		t.Fatalf("env mock error: %v", err)
+		t.Fatalf("env mock error %v", err)
 	}
 
 	opt := os.Getenv("INPUT")
@@ -97,10 +98,12 @@ func TestRunYesNoExit(t *testing.T) {
 		if _, err = wr.WriteString(opt); err != nil {
 			t.Fatal(err)
 		}
-		wr.Close()
+
+		// lint
+		_ = wr.Close()
 
 		if err = Run(env); err != nil {
-			t.Errorf("yesno exit run error: %v", err)
+			t.Errorf("run err %v", err)
 		}
 
 		return
@@ -112,7 +115,7 @@ func TestRunYesNoExit(t *testing.T) {
 			cmd.Env = append(os.Environ(), "INPUT="+test.input)
 
 			if e, ok := cmd.Run().(*exec.ExitError); ok && e.ExitCode() != 0 {
-				t.Errorf("unexpected yes no exit code: %v, want %v", e.ExitCode(), 0)
+				t.Errorf("unexpected yes no result %v, want %v", e.ExitCode(), 0)
 			}
 		})
 	}
@@ -121,11 +124,68 @@ func TestRunYesNoExit(t *testing.T) {
 func TestRunExists(t *testing.T) {
 	env, err := env.Mock(t.Name(), t.TempDir())
 	if err != nil {
-		t.Fatalf("env mock error: %v", err)
+		t.Fatalf("env mock err %v", err)
 	}
 
-	if err = Run(env); err != nil {
-		t.Errorf("run error: %v", err)
+	if got := Run(env); got != nil {
+		t.Errorf("run err %v", got)
+	}
+}
+
+func TestRunMkdirErr(t *testing.T) {
+	env, err := env.Mock(t.Name(), t.TempDir())
+	if err != nil {
+		t.Fatalf("env mock err %v", err)
+	}
+
+	env.Paths.Cfg.Base += "-not-exist"
+
+	path := filepath.Join(t.TempDir(), t.Name())
+
+	if err := os.WriteFile(path, nil, 0600); err != nil {
+		t.Fatal(err)
+	}
+
+	env.Paths.Cfg.Dir = filepath.Join(path, "subdir")
+
+	rdr, wr, err := os.Pipe()
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	defer func(f *os.File) {
+		os.Stdin = f
+	}(os.Stdin)
+
+	os.Stdin = rdr
+
+	// lint
+	_, _ = wr.WriteString("y\n")
+
+	// lint
+	_ = wr.Close()
+
+	if got := Run(env); err == got {
+		t.Error("unexpected run success")
+	}
+}
+
+func TestRunStatErr(t *testing.T) {
+	env, err := env.Mock(t.Name(), t.TempDir())
+	if err != nil {
+		t.Fatalf("env mock error %v", err)
+	}
+
+	path := filepath.Join(t.TempDir(), t.Name())
+
+	if err := os.WriteFile(path, nil, 0600); err != nil {
+		t.Fatal(err)
+	}
+
+	env.Paths.Cfg.Base = filepath.Join(path, "not-exist")
+
+	if got := Run(env); got == nil {
+		t.Error("unexpected run success")
 	}
 }
 
@@ -138,19 +198,31 @@ func TestSysd(t *testing.T) {
 	input := t.TempDir()
 
 	if err := Sysd(input, filepath.Join(input, t.Name())); err != nil {
-		t.Errorf("systemd error: %v", err)
+		t.Errorf("sysd err %v", err)
 	}
 }
 
 func TestSysdUnsupported(t *testing.T) {
-	if os.Getuid() != 0 {
-		fmt.Println("install: systemd tests require root")
-		return
+	if os.Getuid() == 0 {
+		t.Skip("test requires non-root")
 	}
 
-	input := filepath.Join(t.TempDir(), "not-exist")
+	var (
+		got  = Sysd(t.TempDir(), filepath.Join(t.TempDir(), "bin"))
+		want = "install: systemd support require root"
+	)
 
-	if err := Sysd(input, filepath.Join(input, t.Name())); !errors.Is(err, ErrSysdMissing) {
-		t.Errorf("systemd error: %v", err)
+	if got == nil {
+		t.Error("unexpected sysd success")
+	}
+
+	if got.Error() != want {
+		t.Errorf("unexpected sysd err %v, want %v", got, want)
+	}
+}
+
+func TestSysdMonitorSkip(t *testing.T) {
+	if got := Sysd(t.TempDir(), "-monitor"); got != nil {
+		t.Errorf("sysd err %v", got)
 	}
 }

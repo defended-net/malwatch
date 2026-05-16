@@ -84,8 +84,8 @@ func New(path string) *Cfg {
 }
 
 // Load reads the cfg from toml path.
-func (cfg *Cfg) Load() error {
-	return fsys.ReadTOML(cfg.Path(), cfg)
+func (cfg *Cfg) Load(root *os.Root) error {
+	return fsys.ReadTOML(root, cfg.Path(), cfg)
 }
 
 // NewVerbs returns verbs based on given path and rules.
@@ -161,7 +161,7 @@ func (cfg *Cfg) Get(key string) []*Loadout {
 }
 
 // AddSigVerbs adds a given sig's verbs.
-func (cfg *Cfg) AddSigVerbs(acters []acter.Acter, rule string, verbs []string) error {
+func (cfg *Cfg) AddSigVerbs(root *os.Root, acters []acter.Acter, rule string, verbs []string) error {
 	valid := Validate(acters, verbs)
 
 	switch {
@@ -195,11 +195,11 @@ func (cfg *Cfg) AddSigVerbs(acters []acter.Acter, rule string, verbs []string) e
 		return err
 	}
 
-	return fsys.WriteTOML(cfg.path, cfg)
+	return fsys.WriteTOML(root, cfg.path, cfg)
 }
 
 // AddPathVerbs adds given path's verbs.
-func (cfg *Cfg) AddPathVerbs(acters []acter.Acter, path string, rule string, verbs []string) error {
+func (cfg *Cfg) AddPathVerbs(root *os.Root, acters []acter.Acter, path string, rule string, verbs []string) error {
 	valid := Validate(acters, verbs)
 
 	path, _ = strings.CutSuffix(path, "/")
@@ -237,11 +237,11 @@ func (cfg *Cfg) AddPathVerbs(acters []acter.Acter, path string, rule string, ver
 		return err
 	}
 
-	return fsys.WriteTOML(cfg.path, cfg)
+	return fsys.WriteTOML(root, cfg.path, cfg)
 }
 
 // SetSigVerbs sets given sig's verbs.
-func (cfg *Cfg) SetSigVerbs(acters []acter.Acter, rule string, verbs []string) error {
+func (cfg *Cfg) SetSigVerbs(root *os.Root, acters []acter.Acter, rule string, verbs []string) error {
 	switch {
 	case !re.IsValidYrName(rule):
 		return fmt.Errorf("%w, %v", ErrInvalidChars, rule)
@@ -252,11 +252,11 @@ func (cfg *Cfg) SetSigVerbs(acters []acter.Acter, rule string, verbs []string) e
 
 	cfg.Signatures[rule] = []string{}
 
-	return cfg.AddSigVerbs(acters, rule, verbs)
+	return cfg.AddSigVerbs(root, acters, rule, verbs)
 }
 
 // SetPathVerbs sets given path's verbs.
-func (cfg *Cfg) SetPathVerbs(acters []acter.Acter, path string, rule string, verbs []string) error {
+func (cfg *Cfg) SetPathVerbs(root *os.Root, acters []acter.Acter, path string, rule string, verbs []string) error {
 	path, _ = strings.CutSuffix(path, "/")
 
 	switch {
@@ -272,11 +272,11 @@ func (cfg *Cfg) SetPathVerbs(acters []acter.Acter, path string, rule string, ver
 
 	cfg.Paths[path][rule] = []string{}
 
-	return cfg.AddPathVerbs(acters, path, rule, verbs)
+	return cfg.AddPathVerbs(root, acters, path, rule, verbs)
 }
 
 // DelSigVerbs deletes sig's verbs.
-func (cfg *Cfg) DelSigVerbs(sig string) error {
+func (cfg *Cfg) DelSigVerbs(root *os.Root, sig string) error {
 	if _, ok := cfg.Signatures[sig]; !ok {
 		return fmt.Errorf("%w, %v", ErrNoActs, sig)
 	}
@@ -285,11 +285,11 @@ func (cfg *Cfg) DelSigVerbs(sig string) error {
 
 	delete(cfg.Signatures, sig)
 
-	return fsys.WriteTOML(cfg.path, cfg)
+	return fsys.WriteTOML(root, cfg.path, cfg)
 }
 
 // DelPathVerbs deletes given path's verbs.
-func (cfg *Cfg) DelPathVerbs(path string) error {
+func (cfg *Cfg) DelPathVerbs(root *os.Root, path string) error {
 	path, _ = strings.CutSuffix(path, "/")
 
 	if _, ok := cfg.Paths[path]; !ok {
@@ -300,7 +300,7 @@ func (cfg *Cfg) DelPathVerbs(path string) error {
 
 	delete(cfg.Paths, path)
 
-	return fsys.WriteTOML(cfg.path, cfg)
+	return fsys.WriteTOML(root, cfg.path, cfg)
 }
 
 // Compact compacts verbs.
@@ -372,6 +372,13 @@ func GetSkips(cfg *Cfg, paths *path.Paths) *Skips {
 	}
 
 	return skips
+}
+
+// HasFile checks if given file is in skip list.
+func (skips *Skips) HasFile(path string) bool {
+	_, ok := skips.Files[path]
+
+	return ok
 }
 
 // Mock mocks a cfg.

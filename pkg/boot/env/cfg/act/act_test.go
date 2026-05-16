@@ -52,12 +52,12 @@ func TestNew(t *testing.T) {
 }
 
 func TestPath(t *testing.T) {
-	input := &Cfg{
+	got := &Cfg{
 		path: t.Name(),
 	}
 
-	if input.Path() != t.Name() {
-		t.Errorf("unexpected cfg path result %v", input.Path())
+	if got.Path() != t.Name() {
+		t.Errorf("unexpected cfg path result %v", got.Path())
 	}
 }
 
@@ -243,80 +243,90 @@ func TestNewVerbs(t *testing.T) {
 
 	for name, test := range tests {
 		t.Run(name, func(t *testing.T) {
-			result := test.cfg.NewVerbs(test.path, test.sig)
+			got := test.cfg.NewVerbs(test.path, test.sig)
 
-			if !reflect.DeepEqual(result, test.want) {
-				t.Errorf("unexpected new verbs result %v, want %v", result, test.want)
+			if !reflect.DeepEqual(got, test.want) {
+				t.Errorf("unexpected new verbs result %v, want %v", got, test.want)
 			}
 		})
 	}
 }
 
 func TestAddRule(t *testing.T) {
-	file, err := os.Create(filepath.Join(t.TempDir(), t.Name()))
-	if err != nil {
-		t.Fatalf("file create error: %v", err)
-	}
-	defer file.Close()
+	var (
+		tmp  = t.TempDir()
+		name = t.Name()
 
-	tests := map[string]struct {
-		path  string
-		sig   string
-		verbs []string
-		want  *Cfg
-	}{
-		"alert": {
-			sig: "eicar",
+		tests = map[string]struct {
+			path  string
+			sig   string
+			verbs []string
+			want  *Cfg
+		}{
+			"alert": {
+				sig: "eicar",
 
-			verbs: []string{
-				verbs[0],
-			},
+				verbs: []string{
+					verbs[0],
+				},
 
-			want: &Cfg{
-				path: file.Name(),
+				want: &Cfg{
+					path: name,
 
-				Signatures: map[string][]string{
-					"eicar": {
-						verbs[0],
+					Signatures: map[string][]string{
+						"eicar": {
+							verbs[0],
+						},
 					},
+
+					Paths: map[string]map[string][]string{},
 				},
-
-				Paths: map[string]map[string][]string{},
 			},
-		},
 
-		"wlist": {
-			sig: "eicar",
+			"wlist": {
+				sig: "eicar",
 
-			verbs: []string{""},
+				verbs: []string{""},
 
-			want: &Cfg{
-				path: file.Name(),
+				want: &Cfg{
+					path: name,
 
-				Signatures: map[string][]string{
-					"eicar": {},
+					Signatures: map[string][]string{
+						"eicar": {},
+					},
+
+					Paths: map[string]map[string][]string{},
 				},
-
-				Paths: map[string]map[string][]string{},
 			},
-		},
+		}
+
+		root, err = os.OpenRoot(tmp)
+	)
+
+	if err != nil {
+		t.Fatalf("open root err %v", err)
 	}
+
+	defer func() {
+		// lint
+		_ = root.Close()
+	}()
 
 	for name, test := range tests {
 		t.Run(name, func(t *testing.T) {
-			cfg := &Cfg{
-				path: file.Name(),
+			input := &Cfg{
+				path: test.want.path,
 
 				Signatures: map[string][]string{},
 				Paths:      map[string]map[string][]string{},
 			}
 
-			if err := cfg.AddSigVerbs(acts, test.sig, test.verbs); err != nil {
-				t.Fatalf("add sig error: %v", err)
+			if got := input.AddSigVerbs(root, acts, test.sig, test.verbs); got != nil {
+				t.Fatalf("add sig verbs err %v", got)
 			}
 
-			if !reflect.DeepEqual(cfg, test.want) {
-				t.Errorf("unexpected add rule verb result %v, want %v", cfg, test.want)
+			if !reflect.DeepEqual(input, test.want) {
+				t.Errorf("unexpected add sig verbs result %v, want %v", input, test.want)
 			}
 		})
 	}
@@ -358,72 +368,82 @@ func TestAddRuleErrs(t *testing.T) {
 		},
 	}
 
-	file, err := os.Create(filepath.Join(t.TempDir(), t.Name()))
-	if err != nil {
-		t.Fatalf("file create error: %v", err)
-	}
-	defer file.Close()
-
 	for name, test := range tests {
 		t.Run(name, func(t *testing.T) {
-			cfg := &Cfg{
-				path: file.Name(),
+			var (
+				input = &Cfg{
+					path:       t.Name(),
+					Signatures: map[string][]string{},
+				}
 
-				Signatures: map[string][]string{},
-			}
+				got = input.AddSigVerbs(nil, acts, test.rule, test.verbs)
+			)
 
-			if err := cfg.AddSigVerbs(acts, test.rule, test.verbs); !errors.Is(err, test.want) {
-				t.Errorf("unexpected add sig error: %v, want %v", err, test.want)
+			if !errors.Is(got, test.want) {
+				t.Errorf("unexpected add sig verbs err %v, want %v", got, test.want)
 			}
 		})
 	}
 }
 
 func TestAddPath(t *testing.T) {
-	file, err := os.Create(filepath.Join(t.TempDir(), t.Name()))
-	if err != nil {
-		t.Fatalf("file create error: %v", err)
-	}
-	defer file.Close()
+	var (
+		tmp  = t.TempDir()
+		name = t.Name()
 
-	tests := map[string]struct {
-		path  string
-		sig   string
-		verbs []string
-		want  map[string]map[string][]string
-	}{
-		"alert": {
-			path: "/target/index.php",
-			sig:  "eicar",
+		tests = map[string]struct {
+			path  string
+			sig   string
+			verbs []string
+			want  map[string]map[string][]string
+		}{
+			"alert": {
+				path: "/target/index.php",
+				sig:  "eicar",
 
-			verbs: []string{
-				verbs[0],
-			},
+				verbs: []string{
+					verbs[0],
+				},
 
-			want: map[string]map[string][]string{
-				"/target/index.php": {
-					"eicar": []string{
-						verbs[0],
+				want: map[string]map[string][]string{
+					"/target/index.php": {
+						"eicar": []string{
+							verbs[0],
+						},
 					},
 				},
 			},
-		},
+		}
+
+		root, err = os.OpenRoot(tmp)
+	)
+
+	if err != nil {
+		t.Fatalf("open root err %v", err)
 	}
 
-	for name, test := range tests {
-		t.Run(name, func(t *testing.T) {
-			cfg := &Cfg{
-				path: file.Name(),
+	defer func() {
+		// lint
+		_ = root.Close()
+	}()
 
-				Paths: map[string]map[string][]string{},
+	for subname, test := range tests {
+		t.Run(subname, func(t *testing.T) {
+			var (
+				input = &Cfg{
+					path:  name,
+					Paths: map[string]map[string][]string{},
+				}
+
+				got = input.AddPathVerbs(root, acts, test.path, test.sig, test.verbs)
+			)
+
+			if got != nil {
+				t.Fatalf("add path verbs err %v", got)
 			}
 
-			if err := cfg.AddPathVerbs(acts, test.path, test.sig, test.verbs); err != nil {
-				t.Fatalf("add path error: %v", err)
-			}
-
-			if !reflect.DeepEqual(cfg.Paths, test.want) {
-				t.Errorf("unexpected add path verb result %v, want %v", cfg.Paths, test.want)
+			if !reflect.DeepEqual(input.Paths, test.want) {
+				t.Errorf("unexpected add path verbs result %v, want %v", input.Paths, test.want)
 			}
 		})
 	}
@@ -447,73 +467,84 @@ func TestAddPathErrs(t *testing.T) {
 		},
 	}
 
-	file, err := os.Create(filepath.Join(t.TempDir(), t.Name()))
-	if err != nil {
-		t.Fatalf("file create error: %v", err)
-	}
-	defer file.Close()
-
 	for name, test := range tests {
 		t.Run(name, func(t *testing.T) {
-			cfg := &Cfg{
-				path: file.Name(),
+			var (
+				input = &Cfg{
+					path:  t.Name(),
+					Paths: paths,
+				}
 
-				Paths: paths,
-			}
+				got = input.AddPathVerbs(nil, acts, test.path, test.rule, test.verbs)
+			)
 
-			if err := cfg.AddPathVerbs(acts, test.path, test.rule, test.verbs); !errors.Is(err, test.want) {
-				t.Errorf("unexpected add path verb error: %v, want %v", err, test.want)
+			if !errors.Is(got, test.want) {
+				t.Errorf("unexpected add path verbs err %v, want %v", got, test.want)
 			}
 		})
 	}
 }
 
-func TestSetSig(t *testing.T) {
-	tests := map[string]struct {
-		sig   string
-		verbs []string
-		want  map[string][]string
-	}{
-		"alert": {
-			sig: "eicar",
+func TestSetSigVerbs(t *testing.T) {
+	var (
+		tmp  = t.TempDir()
+		name = t.Name()
 
-			verbs: []string{
-				verbs[0],
-			},
+		tests = map[string]struct {
+			sig   string
+			verbs []string
+			want  map[string][]string
+		}{
+			"alert": {
+				sig: "eicar",
 
-			want: map[string][]string{
-				"eicar": {
+				verbs: []string{
 					verbs[0],
 				},
+
+				want: map[string][]string{
+					"eicar": {
+						verbs[0],
+					},
+				},
 			},
-		},
-	}
+		}
 
-	file, err := os.Create(filepath.Join(t.TempDir(), t.Name()))
+		root, err = os.OpenRoot(tmp)
+	)
+
 	if err != nil {
-		t.Fatalf("file create error: %v", err)
+		t.Fatalf("open root err %v", err)
 	}
-	defer file.Close()
 
-	for name, test := range tests {
-		t.Run(name, func(t *testing.T) {
-			cfg := &Cfg{
-				path:       file.Name(),
-				Signatures: map[string][]string{},
+	defer func() {
+		// lint
+		_ = root.Close()
+	}()
+
+	for subname, test := range tests {
+		t.Run(subname, func(t *testing.T) {
+			var (
+				input = &Cfg{
+					path:       name,
+					Signatures: map[string][]string{},
+				}
+
+				got = input.SetSigVerbs(root, acts, test.sig, test.verbs)
+			)
+
+			if got != nil {
+				t.Fatalf("set sig verbs err %v", err)
 			}
 
-			if err := cfg.SetSigVerbs(acts, test.sig, test.verbs); err != nil {
-				t.Fatalf("set sig error: %v", err)
-			}
-
-			if !reflect.DeepEqual(cfg.Signatures, test.want) {
-				t.Errorf("unexpected set rule result %v, want %v", cfg.Signatures, test.want)
+			if !reflect.DeepEqual(input.Signatures, test.want) {
+				t.Errorf("unexpected set sig verbs result %v, want %v", input.Signatures, test.want)
 			}
 		})
 	}
 }
 
-func TestSetSigErrs(t *testing.T) {
+func TestSetSigVerbsErrs(t *testing.T) {
 	tests := map[string]struct {
 		sig   string
 		verbs []string
@@ -532,65 +563,80 @@ func TestSetSigErrs(t *testing.T) {
 
 	for name, test := range tests {
 		t.Run(name, func(t *testing.T) {
-			cfg := &Cfg{}
+			var (
+				input = &Cfg{}
+				got   = input.SetSigVerbs(nil, []acter.Acter{}, test.sig, test.verbs)
+			)
 
-			if err := cfg.SetSigVerbs([]acter.Acter{}, test.sig, test.verbs); !errors.Is(err, test.want) {
-				t.Errorf("unexpected set rule error: %v, want %v", err, test.want)
+			if !errors.Is(got, test.want) {
+				t.Errorf("unexpected set sig verbs err %v, want %v", got, test.want)
 			}
 		})
 	}
 }
 
 func TestSetPathVerbs(t *testing.T) {
-	file, err := os.Create(filepath.Join(t.TempDir(), t.Name()))
-	if err != nil {
-		t.Fatalf("file create error: %v", err)
-	}
-	defer file.Close()
+	var (
+		tmp  = t.TempDir()
+		name = t.Name()
 
-	tests := map[string]struct {
-		input *Cfg
-		path  string
-		sig   string
-		verbs []string
-		want  map[string]map[string][]string
-	}{
-		"alert": {
-			input: &Cfg{
-				path: file.Name(),
+		tests = map[string]struct {
+			input *Cfg
+			path  string
+			sig   string
+			verbs []string
+			want  map[string]map[string][]string
+		}{
+			"alert": {
+				input: &Cfg{
+					path: name,
 
-				Paths: map[string]map[string][]string{},
-			},
+					Paths: map[string]map[string][]string{},
+				},
 
-			path: "/target/index.php",
-			sig:  "eicar",
+				path: "/target/index.php",
+				sig:  "eicar",
 
-			verbs: []string{
-				verbs[0],
-			},
+				verbs: []string{
+					verbs[0],
+				},
 
-			want: map[string]map[string][]string{
-				"/target/index.php": {
-					"eicar": []string{
-						verbs[0],
+				want: map[string]map[string][]string{
+					"/target/index.php": {
+						"eicar": []string{
+							verbs[0],
+						},
 					},
 				},
 			},
-		},
+		}
+
+		root, err = os.OpenRoot(tmp)
+	)
+
+	if err != nil {
+		t.Fatalf("open root err %v", err)
 	}
 
-	for name, test := range tests {
-		t.Run(name, func(t *testing.T) {
-			if err := test.input.SetPathVerbs(
+	defer func() {
+		// lint
+		_ = root.Close()
+	}()
+
+	for subname, test := range tests {
+		t.Run(subname, func(t *testing.T) {
+			if got := test.input.SetPathVerbs(
+				root,
 				acts,
 				test.path,
 				test.sig,
-				test.verbs); err != nil {
-				t.Fatalf("add path verbs error: %v", err)
+				test.verbs,
+			); got != nil {
+				t.Fatalf("set path verbs err %v", got)
 			}
 
 			if !reflect.DeepEqual(test.input.Paths, test.want) {
-				t.Errorf("unexpected set path verb result %v, want %v", test.input.Paths, test.want)
+				t.Errorf("unexpected set path verbs result %v, want %v", test.input.Paths, test.want)
 			}
 		})
 	}
@@ -628,47 +674,57 @@ func TestSetPathVerbsErrs(t *testing.T) {
 				Paths:      map[string]map[string][]string{},
 			}
 
-			if err := cfg.SetPathVerbs([]acter.Acter{}, test.path, test.rule, test.verbs); !errors.Is(err, test.want) {
-				t.Errorf("unexpected set path verb error: %v, want %v", err, test.want)
+			if got := cfg.SetPathVerbs(nil, []acter.Acter{}, test.path, test.rule, test.verbs); !errors.Is(got, test.want) {
+				t.Errorf("unexpected set path verb err %v, want %v", got, test.want)
 			}
 		})
 	}
 }
 
 func TestDelSig(t *testing.T) {
-	file, err := os.Create(filepath.Join(t.TempDir(), t.Name()))
-	if err != nil {
-		t.Fatalf("file create error: %v", err)
-	}
-	defer file.Close()
+	var (
+		tmp  = t.TempDir()
+		name = t.Name()
 
-	tests := map[string]struct {
-		input *Cfg
-		path  string
-		sig   string
-		want  map[string][]string
-	}{
-		"alert": {
-			input: &Cfg{
-				path: file.Name(),
+		tests = map[string]struct {
+			input *Cfg
+			path  string
+			sig   string
+			want  map[string][]string
+		}{
+			"alert": {
+				input: &Cfg{
+					path: name,
 
-				Signatures: map[string][]string{
-					"eicar": {
-						verbs[0],
+					Signatures: map[string][]string{
+						"eicar": {
+							verbs[0],
+						},
 					},
 				},
+
+				sig: "eicar",
+
+				want: map[string][]string{},
 			},
+		}
 
-			sig: "eicar",
+		root, err = os.OpenRoot(tmp)
+	)
 
-			want: map[string][]string{},
-		},
+	if err != nil {
+		t.Fatalf("open root err %v", err)
 	}
 
-	for name, test := range tests {
-		t.Run(name, func(t *testing.T) {
-			if err := test.input.DelSigVerbs(test.sig); err != nil {
-				t.Fatalf("del sig error: %v", err)
+	defer func() {
+		// lint
+		_ = root.Close()
+	}()
+
+	for subname, test := range tests {
+		t.Run(subname, func(t *testing.T) {
+			if got := test.input.DelSigVerbs(root, test.sig); got != nil {
+				t.Fatalf("del sig err %v", got)
 			}
 
 			if !reflect.DeepEqual(test.input.Signatures, test.want) {
@@ -679,60 +735,68 @@ func TestDelSig(t *testing.T) {
 }
 
 func TestDelSigErrs(t *testing.T) {
-	file, err := os.Create(filepath.Join(t.TempDir(), t.Name()))
-	if err != nil {
-		t.Fatalf("file create error: %v", err)
-	}
-	defer file.Close()
+	var (
+		input = &Cfg{
+			path: t.Name(),
 
-	cfg := &Cfg{
-		path: file.Name(),
+			Signatures: map[string][]string{},
+			Paths:      map[string]map[string][]string{},
+		}
 
-		Signatures: map[string][]string{},
-		Paths:      map[string]map[string][]string{},
-	}
+		want = ErrNoActs
+	)
 
-	if err := cfg.DelSigVerbs("eicar"); !errors.Is(err, ErrNoActs) {
-		t.Errorf("unexpected del sig error: %v, want %v", err, ErrNoActs)
+	if got := input.DelSigVerbs(nil, "eicar"); !errors.Is(got, want) {
+		t.Errorf("unexpected del sig err %v, want %v", got, want)
 	}
 }
 
 func TestDelPath(t *testing.T) {
-	file, err := os.Create(filepath.Join(t.TempDir(), t.Name()))
-	if err != nil {
-		t.Fatalf("file create error: %v", err)
-	}
-	defer file.Close()
+	var (
+		tmp  = t.TempDir()
+		name = t.Name()
 
-	tests := map[string]struct {
-		input *Cfg
-		path  string
-		sig   string
-		want  map[string]map[string][]string
-	}{
-		"alert": {
-			input: &Cfg{
-				path: file.Name(),
+		tests = map[string]struct {
+			input *Cfg
+			path  string
+			sig   string
+			want  map[string]map[string][]string
+		}{
+			"alert": {
+				input: &Cfg{
+					path: name,
 
-				Paths: map[string]map[string][]string{
-					"/target/index.php": {
-						"eicar": []string{
-							verbs[0],
+					Paths: map[string]map[string][]string{
+						"/target/index.php": {
+							"eicar": []string{
+								verbs[0],
+							},
 						},
 					},
 				},
+
+				path: "/target/index.php",
+
+				want: map[string]map[string][]string{},
 			},
+		}
 
-			path: "/target/index.php",
+		root, err = os.OpenRoot(tmp)
+	)
 
-			want: map[string]map[string][]string{},
-		},
+	if err != nil {
+		t.Fatalf("open root err %v", err)
 	}
 
-	for name, test := range tests {
-		t.Run(name, func(t *testing.T) {
-			if err := test.input.DelPathVerbs(test.path); err != nil {
-				t.Fatalf("del path error: %v", err)
+	defer func() {
+		// lint
+		_ = root.Close()
+	}()
+
+	for subname, test := range tests {
+		t.Run(subname, func(t *testing.T) {
+			if got := test.input.DelPathVerbs(root, test.path); got != nil {
+				t.Fatalf("del path err %v", got)
 			}
 
 			if !reflect.DeepEqual(test.input.Paths, test.want) {
@@ -769,8 +833,8 @@ func TestDelPathErrs(t *testing.T) {
 
 	for name, test := range tests {
 		t.Run(name, func(t *testing.T) {
-			if err := test.input.DelPathVerbs(test.path); !errors.Is(err, test.want) {
-				t.Errorf("unexpected del path error: %v, want %v", err, test.want)
+			if got := test.input.DelPathVerbs(nil, test.path); !errors.Is(got, test.want) {
+				t.Errorf("unexpected del path err %v, want %v", got, test.want)
 			}
 		})
 	}
@@ -813,6 +877,7 @@ func TestCompact(t *testing.T) {
 		"paths": {
 			input: &Cfg{
 				Signatures: map[string][]string{},
+
 				Paths: map[string]map[string][]string{
 					"/target/index.php": {
 						"eicar": []string{
@@ -864,8 +929,8 @@ func TestCompact(t *testing.T) {
 
 	for name, test := range tests {
 		t.Run(name, func(t *testing.T) {
-			if err := test.input.Compact(test.path, test.sig); err != nil {
-				t.Fatalf("compact error: %v", err)
+			if got := test.input.Compact(test.path, test.sig); got != nil {
+				t.Fatalf("compact err %v", got)
 			}
 
 			if !reflect.DeepEqual(test.input, test.want) {
@@ -890,14 +955,15 @@ func TestGet(t *testing.T) {
 		want = []*Loadout{
 			{
 				Rule: "eicar",
+
 				Actions: []string{
 					"alert",
 				},
 			},
 		}
-	)
 
-	got := input.Get("/target/index.php")
+		got = input.Get("/target/index.php")
+	)
 
 	if !reflect.DeepEqual(got, want) {
 		t.Errorf("unexpected get result %v, want %v", got, want)
@@ -905,198 +971,274 @@ func TestGet(t *testing.T) {
 
 }
 
-func TestSkips(t *testing.T) {
-	file, err := os.Create(filepath.Join(t.TempDir(), t.Name()))
-	if err != nil {
-		t.Fatalf("file create error: %v", err)
-	}
-	defer file.Close()
+func TestGetSkips(t *testing.T) {
+	var (
+		file, err = os.Create(filepath.Join(t.TempDir(), t.Name()))
 
-	tests := map[string]struct {
-		input map[string]map[string][]string
-		want  *Skips
-	}{
-		"skip-file": {
-			input: map[string]map[string][]string{
+		tests = map[string]struct {
+			input map[string]map[string][]string
+			want  *Skips
+		}{
+			"file": {
+				input: map[string]map[string][]string{
+					file.Name(): {
+						"*": []string{},
+					},
+				},
+
+				want: &Skips{
+					Files: map[string]struct{}{
+						file.Name(): {},
+					},
+				},
+			},
+
+			"not-file": {
+				input: map[string]map[string][]string{
+					file.Name(): {
+						"rule": {},
+					},
+				},
+
+				want: &Skips{
+					Files: map[string]struct{}{},
+				},
+			},
+
+			"not-file-verbs": {
+				input: map[string]map[string][]string{
+					file.Name(): {
+						"rule": []string{
+							verbs[0],
+						},
+					},
+				},
+
+				want: &Skips{
+					Files: map[string]struct{}{},
+				},
+			},
+
+			"not-file-composite": {
+				input: map[string]map[string][]string{
+					file.Name(): {
+						"*": []string{
+							verbs[0],
+						},
+					},
+				},
+
+				want: &Skips{
+					Files: map[string]struct{}{},
+				},
+			},
+		}
+
+		paths = &path.Paths{
+			Install: &path.Install{},
+		}
+	)
+
+	if err != nil {
+		t.Fatalf("file create err %v", err)
+	}
+
+	defer func() {
+		// lint
+		_ = file.Close()
+	}()
+
+	for name, test := range tests {
+		t.Run(name, func(t *testing.T) {
+			var (
+				cfg = &Cfg{
+					Paths:      test.input,
+					Quarantine: &Quarantine{},
+				}
+
+				got = GetSkips(cfg, paths)
+			)
+
+			if !reflect.DeepEqual(got, test.want) {
+				t.Errorf("unexpected get skips result %v, want %v", got, test.want)
+			}
+		})
+	}
+}
+
+func TestGetSkipsDirs(t *testing.T) {
+	var (
+		tmp = t.TempDir()
+
+		tests = map[string]struct {
+			input map[string]map[string][]string
+			want  *Skips
+		}{
+			"dir": {
+				input: map[string]map[string][]string{
+					tmp: {
+						"*": {},
+					},
+				},
+
+				want: &Skips{
+					Dirs: []string{
+						tmp,
+					},
+
+					Files: map[string]struct{}{},
+				},
+			},
+
+			"not-dir": {
+				input: map[string]map[string][]string{
+					tmp: {
+						"rule": {},
+					},
+				},
+
+				want: &Skips{
+					Files: map[string]struct{}{},
+				},
+			},
+
+			"not-dir-verbs": {
+				input: map[string]map[string][]string{
+					tmp: {
+						"rule": []string{
+							verbs[0],
+						},
+					},
+				},
+
+				want: &Skips{
+					Files: map[string]struct{}{},
+				},
+			},
+
+			"not-dir-composite": {
+				input: map[string]map[string][]string{
+					tmp: {
+						"*": []string{
+							verbs[0],
+						},
+					},
+				},
+
+				want: &Skips{
+					Files: map[string]struct{}{},
+				},
+			},
+		}
+
+		paths = &path.Paths{
+			Install: &path.Install{},
+		}
+	)
+
+	for name, test := range tests {
+		t.Run(name, func(t *testing.T) {
+			var (
+				cfg = &Cfg{
+					Paths:      test.input,
+					Quarantine: &Quarantine{},
+				}
+
+				got = GetSkips(cfg, paths)
+			)
+
+			if !reflect.DeepEqual(got, test.want) {
+				t.Errorf("unexpected get skips result %v, want %v", got, test.want)
+			}
+		})
+	}
+}
+
+func TestGetSkipsErrs(t *testing.T) {
+	var (
+		file, err = os.Create(filepath.Join(t.TempDir(), t.Name()))
+
+		input = &Cfg{
+			Paths: map[string]map[string][]string{
 				file.Name(): {
 					"*": []string{},
 				},
 			},
 
-			want: &Skips{
-				Files: map[string]struct{}{
-					file.Name(): {},
-				},
-			},
-		},
+			Quarantine: &Quarantine{},
+		}
 
-		"not-skip-file": {
-			input: map[string]map[string][]string{
-				file.Name(): {
-					"rule": {},
-				},
-			},
+		paths = &path.Paths{
+			Install: &path.Install{},
+		}
+	)
 
-			want: &Skips{
-				Files: map[string]struct{}{},
-			},
-		},
-
-		"not-skip-file-verbs": {
-			input: map[string]map[string][]string{
-				file.Name(): {
-					"rule": []string{
-						verbs[0],
-					},
-				},
-			},
-
-			want: &Skips{
-				Files: map[string]struct{}{},
-			},
-		},
-
-		"not-skip-file-composite": {
-			input: map[string]map[string][]string{
-				file.Name(): {
-					"*": []string{
-						verbs[0],
-					},
-				},
-			},
-
-			want: &Skips{
-				Files: map[string]struct{}{},
-			},
-		},
-	}
-
-	paths := &path.Paths{
-		Install: &path.Install{},
-	}
-
-	for name, test := range tests {
-		t.Run(name, func(t *testing.T) {
-			cfg := &Cfg{
-				Paths:      test.input,
-				Quarantine: &Quarantine{},
-			}
-
-			result := GetSkips(cfg, paths)
-
-			if !reflect.DeepEqual(result, test.want) {
-				t.Errorf("unexpected skip files result %v, want %v", result, test.want)
-			}
-		})
-	}
-}
-
-func TestSkipDirs(t *testing.T) {
-	dir := t.TempDir()
-
-	tests := map[string]struct {
-		input map[string]map[string][]string
-		want  *Skips
-	}{
-		"skip-dir": {
-			input: map[string]map[string][]string{
-				dir: {
-					"*": {},
-				},
-			},
-
-			want: &Skips{
-				Dirs: []string{
-					dir,
-				},
-
-				Files: map[string]struct{}{},
-			},
-		},
-
-		"not-skip-dir": {
-			input: map[string]map[string][]string{
-				dir: {
-					"rule": {},
-				},
-			},
-
-			want: &Skips{
-				Files: map[string]struct{}{},
-			},
-		},
-
-		"not-skip-dir-verbs": {
-			input: map[string]map[string][]string{
-				dir: {
-					"rule": []string{
-						verbs[0],
-					},
-				},
-			},
-
-			want: &Skips{
-				Files: map[string]struct{}{},
-			},
-		},
-
-		"not-skip-dir-composite": {
-			input: map[string]map[string][]string{
-				dir: {
-					"*": []string{
-						verbs[0],
-					},
-				},
-			},
-
-			want: &Skips{
-				Files: map[string]struct{}{},
-			},
-		},
-	}
-
-	paths := &path.Paths{
-		Install: &path.Install{},
-	}
-
-	for name, test := range tests {
-		t.Run(name, func(t *testing.T) {
-			cfg := &Cfg{
-				Paths:      test.input,
-				Quarantine: &Quarantine{},
-			}
-
-			result := GetSkips(cfg, paths)
-
-			if !reflect.DeepEqual(result, test.want) {
-				t.Errorf("unexpected skip dirs result %v, want %v", result, test.want)
-			}
-		})
-	}
-}
-
-func TestSkipsErrs(t *testing.T) {
-	file, err := os.Create(filepath.Join(t.TempDir(), t.Name()))
 	if err != nil {
-		t.Errorf("file create error: %v", err)
+		t.Errorf("file create err %v", err)
 	}
-	defer file.Close()
 
-	cfg := &Cfg{
-		Paths: map[string]map[string][]string{
-			file.Name(): {
-				"*": []string{},
+	defer func() {
+		// lint
+		_ = file.Close()
+	}()
+
+	GetSkips(input, paths)
+}
+
+func TestHasFile(t *testing.T) {
+	var (
+		skips = &Skips{
+			Files: map[string]struct{}{
+				"/usr/bin/echo":  {},
+				"/usr/bin/true":  {},
+				"/usr/bin/false": {},
 			},
-		},
+		}
 
-		Quarantine: &Quarantine{},
+		tests = []struct {
+			name  string
+			input string
+			want  bool
+		}{
+			{
+				name:  "match",
+				input: "/usr/bin/true",
+				want:  true,
+			},
+
+			{
+				name:  "match-other",
+				input: "/usr/bin/false",
+				want:  true,
+			},
+
+			{
+				name:  "miss",
+				input: "/etc/file",
+				want:  false,
+			},
+
+			{
+				name:  "empty",
+				input: "",
+				want:  false,
+			},
+
+			{
+				name:  "pfx",
+				input: "/etc",
+				want:  false,
+			},
+		}
+	)
+
+	for _, test := range tests {
+		t.Run(test.name, func(t *testing.T) {
+			if got := skips.HasFile(test.input); got != test.want {
+				t.Errorf("unexpected has file result %v, want %v", got, test.want)
+			}
+		})
 	}
-
-	paths := &path.Paths{
-		Install: &path.Install{},
-	}
-
-	GetSkips(cfg, paths)
 }
 
 func TestMock(t *testing.T) {

@@ -9,6 +9,7 @@ import (
 	"log/slog"
 	"os"
 	"path/filepath"
+	"text/template"
 
 	"github.com/defended-net/malwatch/pkg/boot/env"
 	"github.com/defended-net/malwatch/pkg/boot/env/cfg"
@@ -22,10 +23,27 @@ import (
 	"github.com/defended-net/malwatch/pkg/tui"
 )
 
+var tmpl = template.Must(
+	template.New("unit").Parse(
+		`[Unit]
+Description=malwatch-monitor
+
+[Service]
+ExecStart={{.BinPath}} start
+
+[Install]
+WantedBy=multi-user.target
+`))
+
 // Run performs initial install.
 func Run(env *env.Env) error {
+	baseName, err := fsys.RootName(env.Paths.Install.Root, env.Paths.Cfg.Base)
+	if err != nil {
+		return err
+	}
+
 	// cfg dir exists, abort.
-	if _, err := os.Stat(env.Paths.Cfg.Base); err == nil {
+	if _, err := env.Paths.Install.Root.Stat(baseName); err == nil {
 		return nil
 	} else if !errors.Is(err, os.ErrNotExist) {
 		return err
@@ -45,7 +63,12 @@ func Run(env *env.Env) error {
 		env.Paths.Plat.Dir,
 		env.Paths.Install.Tmp,
 	} {
-		if err := os.MkdirAll(dir, 0700); err != nil {
+		name, err := fsys.RootName(env.Paths.Install.Root, dir)
+		if err != nil {
+			return err
+		}
+
+		if err := env.Paths.Install.Root.MkdirAll(name, 0700); err != nil {
 			return err
 		}
 	}
@@ -55,7 +78,7 @@ func Run(env *env.Env) error {
 
 	// Before proceeding, let's write. Referenced fields (acts, etc)
 	// can then be excluded to ensure a lean file.
-	if err := fsys.WriteTOML(env.Paths.Cfg.Base, env.Cfg); err != nil {
+	if err := fsys.WriteTOML(env.Paths.Install.Root, baseName, env.Cfg); err != nil {
 		return err
 	}
 
@@ -89,7 +112,7 @@ func Run(env *env.Env) error {
 		env.Cfg.Acts,
 		env.Cfg.Secrets,
 	} {
-		if err := fsys.WriteTOML(cfg.Path(), cfg); err != nil {
+		if err := fsys.WriteTOML(env.Paths.Install.Root, cfg.Path(), cfg); err != nil {
 			return err
 		}
 	}
@@ -111,26 +134,27 @@ func Sysd(sysdDir string, binPath string) error {
 
 	slog.Info("installing systemd unit")
 
-	dst := filepath.Join(sysdDir, "malwatch-monitor.service")
-
-	if _, err := os.Stat(sysdDir); err != nil {
-		if os.IsNotExist(err) {
+	root, err := os.OpenRoot(sysdDir)
+	if err != nil {
+		if errors.Is(err, os.ErrNotExist) {
 			return fmt.Errorf("%w, %v", ErrSysdMissing, sysdDir)
 		}
 
 		return err
 	}
+	defer fsys.Close(root)
 
-	// runlevel 3, 4, 5
-	cfg := `[Unit]
-Description=malwatch-monitor
+	file, err := root.OpenFile("malwatch-monitor.service", os.O_RDWR|os.O_CREATE|os.O_TRUNC, 0600)
+	if err != nil {
+		return fmt.Errorf("%w, %v", err, filepath.Join(sysdDir, "malwatch-monitor.service"))
+	}
+	defer fsys.Close(file)
 
-[Service]
-ExecStart=` + binPath + ` start
+	return tmpl.Execute(
+		file,
 
-[Install]
-WantedBy=multi-user.target
-`
-
-	return os.WriteFile(dst, []byte(cfg), 0600)
+		struct{ BinPath string }{
+			BinPath: binPath,
+		},
+	)
 }
