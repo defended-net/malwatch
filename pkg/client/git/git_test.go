@@ -20,14 +20,24 @@ func TestClone(t *testing.T) {
 
 	tag, err := Clone(repo, t.TempDir())
 	if err != nil {
-		t.Fatalf("clone error: %s", err)
+		t.Fatalf("clone err %s", err)
 	}
 
 	fmt.Println(tag)
 }
 
-func TestLatestTag(t *testing.T) {
+func TestCloneErrs(t *testing.T) {
+	repo := &secret.Repo{
+		URL: "https://github.com/defended-net/not-exist",
+	}
+
+	if _, err := Clone(repo, t.TempDir()); err == nil {
+		t.Errorf("unexpected clone success")
+	}
+}
+
+func TestGet(t *testing.T) {
 	if _, err := http.Get(repo); err != nil {
-		t.Errorf("http get error: %s", err)
+		t.Errorf("get err %s", err)
 	}
 }

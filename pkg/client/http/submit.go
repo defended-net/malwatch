@@ -10,6 +10,7 @@ import (
 	"time"
 
 	"github.com/defended-net/malwatch/pkg/boot/env/cfg/secret"
+	"github.com/defended-net/malwatch/pkg/fsys"
 )
 
 // Submit uploads a malware sample.
@@ -32,17 +33,23 @@ func Submit(secrets *secret.Submit, path string) error {
 		}
 	)
 
+	if err := fsys.HasDotDots(path); err != nil {
+		return err
+	}
+
+	fd, _, err := fsys.Open(path)
+	if err != nil {
+		return err
+	}
+
+	file := os.NewFile(uintptr(fd), path)
+	defer fsys.Close(file)
+
 	go func() {
-		defer wr.Close()
+		defer fsys.Close(wr)
 
-		file, err := os.Open(path)
-		if err != nil {
-			return
-		}
-		defer file.Close()
-
-		if _, err = io.Copy(wr, file); err != nil {
-			return
+		if _, err := io.Copy(wr, file); err != nil {
+			wr.CloseWithError(err)
 		}
 	}()
 
