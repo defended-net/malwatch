@@ -13,24 +13,40 @@ jobs:
     timeout-minutes: 5
     permissions:
       contents: read
+
     steps:
       - name: checkout
         uses: actions/checkout@v4
 
-      - name: set up go
+      - name: setup go
         uses: actions/setup-go@v5
         with:
+          go-version-file: go.mod
           check-latest: true
+          cache: true
 
-      - name: Expose github environment as shell variables
+      - name: tests
         env:
-          SECRETS_CONTEXT: ${{ toJson(secrets) }}
+          JSON_USER: ${{ secrets.JSON_USER }}
+          JSON_PASS: ${{ secrets.JSON_PASS }}
+          PD_TOKEN: ${{ secrets.PD_TOKEN }}
+          SLACK_WEBHOOK: ${{ secrets.SLACK_WEBHOOK }}
+          SMTP_HOSTNAME: ${{ secrets.SMTP_HOSTNAME }}
+          SMTP_PORT: ${{ secrets.SMTP_PORT }}
+          SMTP_USER: ${{ secrets.SMTP_USER }}
+          SMTP_PASS: ${{ secrets.SMTP_PASS }}
+          SMTP_TO: ${{ secrets.SMTP_TO }}
+          SMTP_FROM: ${{ secrets.SMTP_FROM }}
+          S3_ENDPOINT: ${{ secrets.S3_ENDPOINT }}
+          S3_REGION: ${{ secrets.S3_REGION }}
+          S3_BUCKET: ${{ secrets.S3_BUCKET }}
+          S3_KEY: ${{ secrets.S3_KEY }}
+          S3_SECRET: ${{ secrets.S3_SECRET }}
+          SUBMIT_ENDPOINT: ${{ secrets.SUBMIT_ENDPOINT }}
+          SUBMIT_KEY: ${{ secrets.SUBMIT_KEY }}
+          GIT_0_USER: ${{ secrets.GIT_0_USER }}
+          GIT_0_TOKEN: ${{ secrets.GIT_0_TOKEN }}
+          GIT_0_URL: ${{ secrets.GIT_0_URL }}
         run: |
-          EOF=$(dd if=/dev/urandom bs=15 count=1 status=none | base64)
-          to_envs() { jq -r "to_entries[] | \"\(.key)<<$EOF\n\(.value)\n$EOF\n\""; }
-          echo "$SECRETS_CONTEXT" | to_envs >> $GITHUB_ENV
-
-      - name: run tests
-        env:
-          SECRETS_CONTEXT: ${{ toJson(secrets) }}
-        run: go test $(go list ./... | grep -v /yr)
+          pkgs=$(go list ./... | grep -v '/yr' || true)
+          [ -n "$pkgs" ] && go test $pkgs
