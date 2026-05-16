@@ -6,12 +6,15 @@ package cpanel
 import (
 	"encoding/json"
 	"fmt"
+	"log/slog"
+	"os"
 	"path/filepath"
 	"slices"
 
 	"github.com/defended-net/malwatch/pkg/boot/env"
 	"github.com/defended-net/malwatch/pkg/boot/env/re"
 	"github.com/defended-net/malwatch/pkg/exec"
+	"github.com/defended-net/malwatch/pkg/fsys"
 	"github.com/defended-net/malwatch/pkg/plat"
 	"github.com/defended-net/malwatch/pkg/plat/acter"
 	"github.com/defended-net/malwatch/pkg/plat/preset/act"
@@ -84,8 +87,8 @@ func New(env *env.Env) *Plat {
 }
 
 // Load reads given plat's cfgs.
-func (plat *Plat) Load() error {
-	acters, err := acter.Load(plat.acters)
+func (plat *Plat) Load(root *os.Root) error {
+	acters, err := acter.Load(root, plat.acters)
 	if err != nil {
 		return err
 	}
@@ -100,7 +103,7 @@ func (plat *Plat) Load() error {
 		"/dev/shm",
 	}
 
-	paths, err := plat.GetDocRoots()
+	paths, err := plat.DocRoots()
 	if err != nil {
 		return err
 	}
@@ -108,6 +111,7 @@ func (plat *Plat) Load() error {
 	for _, path := range append(paths, tmps...) {
 		if slices.Contains(plat.cfg.SkipAccs, re.Target(path)) ||
 			slices.Contains(plat.env.Cfg.Scans.Paths, path) {
+
 			continue
 		}
 
@@ -117,8 +121,8 @@ func (plat *Plat) Load() error {
 	return nil
 }
 
-// GetDocRoots performs a get_domain_info request and returns docroot paths.
-func (plat *Plat) GetDocRoots() ([]string, error) {
+// DocRoots performs a get_domain_info request and returns docroot paths.
+func (plat *Plat) DocRoots() ([]string, error) {
 	var (
 		info  = &DomainInfo{}
 		args  = append(plat.domainInfo, "--output=jsonpretty")
@@ -139,8 +143,24 @@ func (plat *Plat) GetDocRoots() ([]string, error) {
 		return nil, fmt.Errorf("%w, %v", ErrAPIDomInfoUnmarshal, err)
 	}
 
-	for _, path := range info.Data.Domains {
-		paths = append(paths, path.Docroot, filepath.Join(filepath.Dir(path.Docroot), "tmp"))
+	for _, domain := range info.Data.Domains {
+		var (
+			docroot = domain.Docroot
+			tmp     = filepath.Join(filepath.Dir(docroot), "tmp")
+		)
+
+		for _, path := range []string{
+			docroot,
+			tmp,
+		} {
+			if err := fsys.HasDotDots(path); err != nil {
+				slog.Info(fsys.ErrPathInvalid.Error(), "path", path, "err", err)
+
+				continue
+			}
+
+			paths = append(paths, path)
+		}
 	}
 
 	return paths, nil

@@ -11,10 +11,10 @@ import (
 func TestPath(t *testing.T) {
 	var (
 		want = filepath.Join(t.TempDir(), t.Name())
-		cfg  = NewCfg(want)
+		got  = NewCfg(want)
 	)
 
-	if cfg.Path() != want {
-		t.Errorf("unexpected cfg path result %v, want %v", cfg.Path(), want)
+	if got.Path() != want {
+		t.Errorf("unexpected cfg path result %v, want %v", got.Path(), want)
 	}
 }

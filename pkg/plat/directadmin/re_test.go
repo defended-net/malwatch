@@ -35,7 +35,7 @@ func TestTarget(t *testing.T) {
 			want:  false,
 		},
 
-		"special-char": {
+		"special": {
 			input: "/home/user#",
 			want:  false,
 		},
@@ -68,10 +68,8 @@ func TestTarget(t *testing.T) {
 
 	for name, test := range tests {
 		t.Run(name, func(t *testing.T) {
-			result := reTarget.MatchString(test.input)
-
-			if result != test.want {
-				t.Errorf("unexpected regex result %v, want %v", result, test.want)
+			if got := reTarget.MatchString(test.input); got != test.want {
+				t.Errorf("unexpected regex result %v, want %v", got, test.want)
 			}
 		})
 	}

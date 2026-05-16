@@ -4,9 +4,9 @@
 package cpanel
 
 import (
+	"errors"
 	"reflect"
 	"slices"
-	"strings"
 	"testing"
 
 	"github.com/defended-net/malwatch/pkg/boot/env"
@@ -18,7 +18,7 @@ import (
 func TestNew(t *testing.T) {
 	env, err := env.Mock(t.Name(), t.TempDir())
 	if err != nil {
-		t.Fatalf("env mock error: %v", err)
+		t.Fatalf("env mock err %v", err)
 	}
 
 	New(env)
@@ -27,71 +27,74 @@ func TestNew(t *testing.T) {
 func TestLoad(t *testing.T) {
 	plat, err := Mock(t.Name(), t.TempDir())
 	if err != nil {
-		t.Fatalf("mock error: %v", err)
+		t.Fatalf("plat mock err %v", err)
 	}
 
-	if err = plat.Load(); err != nil {
-		t.Errorf("load error: %v", err)
+	if got := plat.Load(nil); got != nil {
+		t.Errorf("load err %v", got)
 	}
 }
 
 func TestExec(t *testing.T) {
-	result, err := exec.Run("echo", t.Name())
+	got, err := exec.Run("echo", t.Name())
 	if err != nil {
-		t.Fatalf("exec error: %v", err)
+		t.Fatalf("exec err %v", err)
 	}
 
-	if string(result) != t.Name()+"\n" {
-		t.Errorf("unexpected exec result %v, want %v", string(result), t.Name())
+	if string(got) != t.Name()+"\n" {
+		t.Errorf("unexpected exec result %v, want %v", string(got), t.Name())
 	}
 }
 
-func TestGetDomainInfo(t *testing.T) {
-	plat, err := Mock(t.Name(), t.TempDir())
+func TestDocRoots(t *testing.T) {
+	var (
+		input, err = Mock(t.Name(), t.TempDir())
+
+		want = []string{
+			"/home/one/public_html",
+			"/home/one/tmp",
+			"/home/two/public_html",
+			"/home/two/tmp",
+			"/home/three/public_html",
+			"/home/three/tmp",
+		}
+	)
+
 	if err != nil {
-		t.Fatalf("mock error: %v", err)
+		t.Fatalf("plat mock err %v", err)
 	}
 
-	want := []string{
-		"/home/one/public_html",
-		"/home/one/tmp",
-		"/home/two/public_html",
-		"/home/two/tmp",
-		"/home/three/public_html",
-		"/home/three/tmp",
-	}
-
-	result, err := plat.GetDocRoots()
+	got, err := input.DocRoots()
 	if err != nil {
-		t.Fatalf("get domain error: %v", err)
+		t.Fatalf("docroots err %v", err)
 	}
 
-	if !slices.Equal(result, want) {
-		t.Errorf("unexpected get domain info result %v, want %v", result, want)
+	if !slices.Equal(got, want) {
+		t.Errorf("unexpected docroots result %v, want %v", got, want)
 	}
 }
 
-func TestGetDomainInfoErrs(t *testing.T) {
-	mock := &Plat{
+func TestDocRootsErrs(t *testing.T) {
+	input := &Plat{
 		bin: t.Name(),
 	}
 
-	if _, err := mock.GetDocRoots(); err != nil && !strings.HasPrefix(err.Error(), "exec: run error") {
-		t.Errorf("unexpected get domain success")
+	if _, got := input.DocRoots(); !errors.Is(got, exec.ErrRun) {
+		t.Errorf("unexpected docroots success")
 	}
 }
 
 func TestCfg(t *testing.T) {
 	var (
-		plat = &Plat{
+		input = &Plat{
 			cfg: &Cfg{},
 		}
 
-		got = plat.Cfg()
+		got = input.Cfg()
 	)
 
-	if !reflect.DeepEqual(got, plat.cfg) {
-		t.Errorf("unexpected cfg result %v, want %v", got, plat.cfg)
+	if !reflect.DeepEqual(got, input.cfg) {
+		t.Errorf("unexpected cfg result %v, want %v", got, input.cfg)
 	}
 }
 
@@ -109,6 +112,6 @@ func TestActers(t *testing.T) {
 	)
 
 	if !reflect.DeepEqual(got, plat.acters) {
-		t.Errorf("unexpected acts result %v, want %v", got, plat.acters)
+		t.Errorf("unexpected acters result %v, want %v", got, plat.acters)
 	}
 }

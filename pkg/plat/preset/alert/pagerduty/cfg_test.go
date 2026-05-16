@@ -5,6 +5,7 @@ package pagerduty
 
 import (
 	"errors"
+	"os"
 	"path/filepath"
 	"testing"
 
@@ -12,27 +13,80 @@ import (
 )
 
 func TestLoad(t *testing.T) {
-	cfg := NewCfg(filepath.Join(t.TempDir(), t.Name()))
+	var (
+		root, err = os.OpenRoot(t.TempDir())
+		input     = NewCfg(t.Name())
+	)
 
-	if err := cfg.Load(); err != nil {
-		t.Errorf("cfg load error: %v", err)
+	if err != nil {
+		t.Fatalf("open root err %v", err)
+	}
+
+	defer func() {
+		// lint
+		_ = root.Close()
+	}()
+
+	if got := input.Load(root); got != nil {
+		t.Errorf("cfg load err %v", got)
 	}
 }
 
 func TestLoadErrs(t *testing.T) {
-	cfg := NewCfg(filepath.Join("/dev/null", t.Name()))
+	var (
+		root, err = os.OpenRoot(t.TempDir())
+		input     = NewCfg("../escape")
+		want      = fsys.ErrPathLocal
+	)
 
-	if err := cfg.Load(); !errors.Is(err, fsys.ErrTOMLRead) {
-		t.Errorf("unexpected cfg load error: %v, want %v", err, fsys.ErrTOMLRead)
+	if err != nil {
+		t.Fatalf("open root err %v", err)
+	}
+
+	defer func() {
+		// lint
+		_ = root.Close()
+	}()
+
+	if got := input.Load(root); !errors.Is(got, want) {
+		t.Errorf("unexpected cfg load err %v, want %v", got, want)
+	}
+}
+
+func TestLoadExist(t *testing.T) {
+	var (
+		tmp       = t.TempDir()
+		name      = "cfg.toml"
+		path      = filepath.Join(tmp, name)
+		root, err = os.OpenRoot(tmp)
+		input     = NewCfg(name)
+	)
+
+	if err != nil {
+		t.Fatalf("open root err %v", err)
+	}
+
+	defer func() {
+		// lint
+		_ = root.Close()
+	}()
+
+	if err := os.WriteFile(path, []byte(""), 0600); err != nil {
+		t.Fatalf("file write err %v", err)
+	}
+
+	if got := input.Load(root); got != nil {
+		t.Errorf("unexpected cfg load err %v, want nil", got)
 	}
 }
 
 func TestPath(t *testing.T) {
-	want := filepath.Join(t.TempDir(), t.Name())
+	var (
+		want = t.Name()
+		got  = NewCfg(want)
+	)
 
-	cfg := NewCfg(want)
-
-	if cfg.Path() != want {
-		t.Errorf("unexpected cfg path result %v, want %v", cfg.Path(), want)
+	if got.Path() != want {
+		t.Errorf("unexpected cfg path result %v, want %v", got.Path(), want)
 	}
 }

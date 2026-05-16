@@ -24,7 +24,7 @@ import (
 func TestNewExiler(t *testing.T) {
 	env, err := env.Mock(t.Name(), t.TempDir())
 	if err != nil {
-		t.Fatalf("env mock error: %s", err)
+		t.Fatalf("env mock err %s", err)
 	}
 
 	var (
@@ -38,20 +38,20 @@ func TestNewExiler(t *testing.T) {
 	)
 
 	if !reflect.DeepEqual(got, want) {
-		t.Errorf("unexpected exiler result %v, want %v", got, want)
+		t.Errorf("unexpected create exiler result %v, want %v", got, want)
 	}
 }
 
 func TestExileLoad(t *testing.T) {
 	env, err := env.Mock(t.Name(), t.TempDir())
 	if err != nil {
-		t.Fatalf("env mock error: %s", err)
+		t.Fatalf("env mock err %s", err)
 	}
 
 	input := NewExiler(env)
 
-	if err := input.Load(); err != nil {
-		t.Errorf("exiler load error: %v", err)
+	if got := input.Load(nil); got != nil {
+		t.Errorf("exiler load err %v", got)
 	}
 }
 
@@ -64,7 +64,7 @@ func TestExileDisabled(t *testing.T) {
 		want = acter.ErrDisabled
 	)
 
-	if got := input.Load(); !errors.Is(got, want) {
+	if got := input.Load(nil); !errors.Is(got, want) {
 		t.Errorf("unexpected exiler load error %v, want %v", got, want)
 	}
 }
@@ -78,8 +78,8 @@ func TestExileNoRegion(t *testing.T) {
 		want = ErrExileNoRegion
 	)
 
-	if err := input.Act(nil); !errors.Is(err, want) {
-		t.Errorf("unexpected exile error %v, want %v", err, want)
+	if got := input.Act(nil); !errors.Is(got, want) {
+		t.Errorf("unexpected act error %v, want %v", got, want)
 	}
 }
 
@@ -101,19 +101,23 @@ func TestExileVerb(t *testing.T) {
 func TestExile(t *testing.T) {
 	env, err := env.Mock(t.Name(), t.TempDir())
 	if err != nil {
-		t.Fatalf("env mock error: %s", err)
+		t.Fatalf("env mock err %s", err)
 	}
 
 	file, err := os.Create(filepath.Join(t.TempDir(), t.Name()))
 	if err != nil {
-		t.Fatalf("file create error: %v", err)
+		t.Fatalf("file create err %v", err)
 	}
-	defer file.Close()
+
+	defer func() {
+		// lint
+		_ = file.Close()
+	}()
 
 	stat := &unix.Stat_t{}
 
 	if err := unix.Stat(file.Name(), stat); err != nil {
-		t.Fatalf("stat error: %v", err)
+		t.Fatalf("stat err %v", err)
 	}
 
 	result := state.NewResult("",
@@ -131,39 +135,43 @@ func TestExile(t *testing.T) {
 
 	transport, err := s3.New(env.Cfg.Secrets.S3)
 	if err != nil {
-		t.Fatalf("transport create error: %v", err)
+		t.Fatalf("transport create err %v", err)
 	}
 
-	exiler := &Exiler{
+	input := &Exiler{
 		secrets:   env.Cfg.Secrets.S3,
 		transport: transport,
 	}
 
-	if err := exiler.Load(); err != nil {
-		t.Fatalf("exiler load error: %v", err)
+	if err := input.Load(nil); err != nil {
+		t.Fatalf("exiler load err %v", err)
 	}
 
-	if err := exiler.Act(result); err != nil {
-		t.Errorf("exiler error: %v", err)
+	if got := input.Act(result); got != nil {
+		t.Errorf("act err %v", got)
 	}
 }
 
 func TestExileRemoved(t *testing.T) {
 	env, err := env.Mock(t.Name(), t.TempDir())
 	if err != nil {
-		t.Fatalf("env mock error: %s", err)
+		t.Fatalf("env mock err %s", err)
 	}
 
 	file, err := os.Create(filepath.Join(t.TempDir(), t.Name()))
 	if err != nil {
-		t.Fatalf("file create error: %v", err)
+		t.Fatalf("file create err %v", err)
 	}
-	defer file.Close()
+
+	defer func() {
+		// lint
+		_ = file.Close()
+	}()
 
 	stat := &unix.Stat_t{}
 
 	if err := unix.Stat(file.Name(), stat); err != nil {
-		t.Fatalf("stat error: %v", err)
+		t.Fatalf("stat err %v", err)
 	}
 
 	hit := state.NewResult(
@@ -185,15 +193,45 @@ func TestExileRemoved(t *testing.T) {
 		},
 	)
 
-	exiler := &Exiler{
+	input := &Exiler{
 		secrets: env.Cfg.Secrets.S3,
 	}
 
-	if err := exiler.Load(); err != nil {
-		t.Fatalf("exiler load error: %v", err)
+	if err := input.Load(nil); err != nil {
+		t.Fatalf("exiler load err %v", err)
 	}
 
-	if err := exiler.Act(hit); err != nil {
-		t.Errorf("exiler error: %v", err)
+	if got := input.Act(hit); got != nil {
+		t.Errorf("act err %v", got)
+	}
+}
+
+func TestExileSingleNoAttr(t *testing.T) {
+	var (
+		input  = &Exiler{}
+		result = state.NewResult("", state.Paths{})
+	)
+
+	input.Single(result, t.TempDir(), &hit.Meta{})
+
+	if len(result.Errs()) == 0 {
+		t.Errorf("unexpected empty errs")
+	}
+}
+
+func TestExileSingleOpenErrs(t *testing.T) {
+	var (
+		input  = &Exiler{}
+		result = state.NewResult("", state.Paths{})
+
+		meta = &hit.Meta{
+			Attr: &fsys.Attr{},
+		}
+	)
+
+	input.Single(result, "/dev/null/not-exist", meta)
+
+	if len(result.Errs()) == 0 {
+		t.Errorf("unexpected empty errs")
 	}
 }

@@ -1,7 +1,7 @@
 // © Roscoe Skeens <rskeens@defended.net>
 // SPDX-License-Identifier: AGPL-3.0-or-later
 
-package smtp
+package slack
 
 import (
 	"errors"
@@ -11,21 +11,22 @@ import (
 	"github.com/defended-net/malwatch/pkg/fsys"
 )
 
-// Cfg represents the cfg.
+// Cfg represents cfg.
 type Cfg struct {
-	path string
-	To   []string `env:"SMTP_TO"`
-	From string   `env:"SMTP_FROM"`
+	path    string
+	User    string
+	Channel string
 }
 
-// NewCfg returns a cfg for given toml path.
+// NewCfg returns cfg for given toml path.
 func NewCfg(path string) *Cfg {
 	return &Cfg{
 		path: path,
+		User: "malwatch",
 	}
 }
 
-// Load reads the cfg from toml path.
+// Load reads cfg from toml path.
 func (cfg *Cfg) Load(root *os.Root) error {
 	if err := fsys.InstallTOML(root, cfg.path, cfg); !errors.Is(err, fs.ErrExist) {
 		return err
@@ -34,7 +35,7 @@ func (cfg *Cfg) Load(root *os.Root) error {
 	return nil
 }
 
-// Path returns a given cfg's toml path.
+// Path returns given cfg toml path.
 func (cfg *Cfg) Path() string {
 	return cfg.path
 }

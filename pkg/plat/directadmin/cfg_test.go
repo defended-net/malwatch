@@ -11,11 +11,24 @@ import (
 )
 
 func TestCfgLoad(t *testing.T) {
-	path := filepath.Join(t.TempDir(), t.Name())
+	var (
+		tmp  = t.TempDir()
+		path = filepath.Join(tmp, t.Name())
+	)
 
 	if _, err := os.Create(path); err != nil {
-		t.Fatalf("file create error: %v", err)
+		t.Fatalf("file create err %v", err)
 	}
+
+	root, err := os.OpenRoot(tmp)
+	if err != nil {
+		t.Fatalf("open root err %v", err)
+	}
+
+	defer func() {
+		// lint
+		_ = root.Close()
+	}()
 
 	var (
 		got = &Cfg{
@@ -28,8 +41,8 @@ func TestCfgLoad(t *testing.T) {
 		}
 	)
 
-	if err := got.Load(); err != nil {
-		t.Fatalf("cfg load error: %v", err)
+	if err := got.Load(root); err != nil {
+		t.Fatalf("cfg load err %v", err)
 	}
 
 	if !reflect.DeepEqual(got, want) {
@@ -38,11 +51,24 @@ func TestCfgLoad(t *testing.T) {
 }
 
 func TestCfgLoadCustomUser(t *testing.T) {
-	path := filepath.Join(t.TempDir(), t.Name())
+	var (
+		tmp  = t.TempDir()
+		path = filepath.Join(tmp, t.Name())
+	)
 
 	if _, err := os.Create(path); err != nil {
-		t.Fatalf("file create error: %v", err)
+		t.Fatalf("file create err %v", err)
 	}
+
+	root, err := os.OpenRoot(tmp)
+	if err != nil {
+		t.Fatalf("open root err %v", err)
+	}
+
+	defer func() {
+		// lint
+		_ = root.Close()
+	}()
 
 	var (
 		got = &Cfg{
@@ -56,8 +82,8 @@ func TestCfgLoadCustomUser(t *testing.T) {
 		}
 	)
 
-	if err := got.Load(); err != nil {
-		t.Fatalf("cfg load error: %v", err)
+	if err := got.Load(root); err != nil {
+		t.Fatalf("cfg load err %v", err)
 	}
 
 	if !reflect.DeepEqual(got, want) {

@@ -15,7 +15,7 @@ import (
 func TestNew(t *testing.T) {
 	env, err := env.Mock(t.Name(), t.TempDir())
 	if err != nil {
-		t.Fatalf("env mock error: %v", err)
+		t.Fatalf("env mock err %v", err)
 	}
 
 	env.Plat = New(env)
@@ -24,23 +24,27 @@ func TestNew(t *testing.T) {
 func TestLoad(t *testing.T) {
 	env, err := env.Mock(t.Name(), t.TempDir())
 	if err != nil {
-		t.Fatalf("env mock error: %v", err)
+		t.Fatalf("env mock err %v", err)
 	}
 
 	env.Cfg.Acts.Quarantine.Dir = ""
 
 	env.Plat = New(env)
 
-	if err := env.Plat.Load(); err != nil {
-		t.Errorf("load error: %v", err)
+	if got := env.Plat.Load(env.Paths.Install.Root); err != got {
+		t.Errorf("plat load err %v", got)
 	}
 }
 
 func TestCfg(t *testing.T) {
 	var (
 		want = &Cfg{}
-		plat = &Plat{cfg: want}
-		got  = plat.Cfg()
+
+		input = &Plat{
+			cfg: want,
+		}
+
+		got = input.Cfg()
 	)
 
 	if !reflect.DeepEqual(got, want) {
@@ -52,11 +56,13 @@ func TestPath(t *testing.T) {
 	var (
 		want = t.TempDir()
 
-		plat = &Plat{
-			cfg: &Cfg{path: want},
+		input = &Plat{
+			cfg: &Cfg{
+				path: want,
+			},
 		}
 
-		got = plat.Cfg().Path()
+		got = input.Cfg().Path()
 	)
 
 	if got != want {
@@ -78,6 +84,6 @@ func TestActers(t *testing.T) {
 	)
 
 	if !reflect.DeepEqual(got, plat.acters) {
-		t.Errorf("unexpected acts result %v, want %v", got, plat.acters)
+		t.Errorf("unexpected acters result %v, want %v", got, plat.acters)
 	}
 }
