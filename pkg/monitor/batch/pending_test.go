@@ -19,7 +19,7 @@ func TestPendingGet(t *testing.T) {
 	got := input.Get()
 
 	if !slices.Equal(got, want) {
-		t.Errorf("unexpected batch get result %v, want %v", got, want)
+		t.Errorf("unexpected get result %v, want %v", got, want)
 	}
 }
 
@@ -34,6 +34,6 @@ func TestPendingAdd(t *testing.T) {
 	got := input.Get()
 
 	if !slices.Equal(got, want) {
-		t.Errorf("unexpected batch add result %v, want %v", got, want)
+		t.Errorf("unexpected add result %v, want %v", got, want)
 	}
 }

@@ -6,6 +6,7 @@ package cli
 import (
 	"flag"
 	"fmt"
+	"log/slog"
 	"sort"
 
 	"github.com/defended-net/malwatch/pkg/boot"
@@ -81,7 +82,10 @@ func (sub Sub) Route() (*Cmd, error) {
 // base returns the entry cmd.
 func base(sub Sub, args []string) (*Cmd, error) {
 	if len(args) == 0 {
-		sub.Print()
+		if err := sub.Print(); err != nil {
+			slog.Error(ErrPrint.Error(), "msg", err)
+		}
+
 		return nil, ErrArgNone
 	}
 

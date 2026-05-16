@@ -5,11 +5,8 @@ package worker
 
 import (
 	"context"
-	"errors"
 	"fmt"
-	"io"
 	"math/rand/v2"
-	"os"
 	"slices"
 	"sync/atomic"
 	"time"
@@ -76,14 +73,17 @@ func (worker *Worker) Work(ctx context.Context, state *state.Job, queue <-chan s
 
 // Scan scans given file path and job state. Results and errs to job state.
 func (worker *Worker) Scan(path string, result *state.Job) {
-	file, err := os.Open(path)
+	fd, err := unix.Open(path, unix.O_RDONLY|unix.O_NOFOLLOW, 0)
 	if err != nil {
 		result.AddErr(fmt.Errorf("%w, %v, %v", ErrFileRead, err, path))
+
 		return
 	}
-	defer file.Close()
 
-	exp, stat := worker.expFn(worker.exp, int(file.Fd()))
+	// nolint
+	defer unix.Close(fd)
+
+	exp, stat := worker.expFn(worker.exp, fd)
 	if exp {
 		return
 	}
@@ -95,12 +95,13 @@ func (worker *Worker) Scan(path string, result *state.Job) {
 
 out:
 	for {
-		offset, err = file.Read(worker.buff)
+		offset, err = unix.Read(fd, worker.buff)
 
 		switch {
 		case offset > 0:
 			if err := scanner.Val.ScanMem(worker.buff[:offset]); err != nil {
 				result.AddErr(fmt.Errorf("%w, %v, %v", ErrYrScan, err, path))
+
 				return
 			}
 
@@ -109,7 +110,7 @@ out:
 		}
 	}
 
-	if err != nil && !errors.Is(err, io.EOF) {
+	if err != nil {
 		result.AddErr(fmt.Errorf("%w, %v, %v", ErrFileRead, err, path))
 	}
 
@@ -121,7 +122,7 @@ out:
 	if stat == nil {
 		stat = &unix.Stat_t{}
 
-		if err := unix.Fstat(int(file.Fd()), stat); err != nil {
+		if err := unix.Fstat(fd, stat); err != nil {
 			result.AddErr(fmt.Errorf("%w, %v, %v", fsys.ErrStat, err, path))
 		}
 	}

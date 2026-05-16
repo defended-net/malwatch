@@ -33,12 +33,12 @@ func TestNewJob(t *testing.T) {
 
 func TestGroup(t *testing.T) {
 	var (
-		dir = t.TempDir()
+		tmp = t.TempDir()
 
 		got = Group("fs",
 			[]*Hit{
 				{
-					Path: dir,
+					Path: tmp,
 					Meta: &hit.Meta{},
 				},
 			},
@@ -47,7 +47,7 @@ func TestGroup(t *testing.T) {
 		want = []*Result{
 			NewResult("fs",
 				Paths{
-					dir: &hit.Meta{},
+					tmp: &hit.Meta{},
 				},
 			),
 		}
@@ -60,12 +60,12 @@ func TestGroup(t *testing.T) {
 
 func TestGroupEmpty(t *testing.T) {
 	var (
-		dir  = t.TempDir()
+		tmp  = t.TempDir()
 		meta = &hit.Meta{}
 
 		hits = []*Hit{
 			{
-				Path: dir, Meta: meta,
+				Path: tmp, Meta: meta,
 			},
 		}
 
@@ -77,9 +77,9 @@ func TestGroupEmpty(t *testing.T) {
 	}
 }
 
-func TestGroupDupes(t *testing.T) {
+func TestGroupDupe(t *testing.T) {
 	var (
-		dir = t.TempDir()
+		tmp = t.TempDir()
 
 		meta = &hit.Meta{
 			Rules: []string{
@@ -93,7 +93,7 @@ func TestGroupDupes(t *testing.T) {
 				Target: "fs",
 
 				Paths: Paths{
-					dir: &hit.Meta{
+					tmp: &hit.Meta{
 						Rules: []string{
 							"rule-one",
 							"rule-two",
@@ -108,12 +108,12 @@ func TestGroupDupes(t *testing.T) {
 
 		hits = []*Hit{
 			{
-				Path: dir,
+				Path: tmp,
 				Meta: meta,
 			},
 
 			{
-				Path: dir,
+				Path: tmp,
 
 				Meta: &hit.Meta{
 					Rules: []string{
@@ -126,7 +126,7 @@ func TestGroupDupes(t *testing.T) {
 		got = Group("fs", hits)
 	)
 
-	if !slices.Equal(got[0].Paths[dir].Rules, want[0].Paths[dir].Rules) {
+	if !slices.Equal(got[0].Paths[tmp].Rules, want[0].Paths[tmp].Rules) {
 		t.Errorf("unexpected group result %v, want %v", got, want)
 	}
 }
@@ -215,9 +215,7 @@ func TestAddErr(t *testing.T) {
 				test.job.AddErr(err)
 			}
 
-			got := test.job.Errs()
-
-			if !slices.Equal(got, test.want) {
+			if got := test.job.Errs(); !slices.Equal(got, test.want) {
 				t.Errorf("unexpected get errs result %v, want %v", got, test.want)
 			}
 		})

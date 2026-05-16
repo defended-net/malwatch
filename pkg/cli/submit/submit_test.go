@@ -6,6 +6,8 @@ package submit
 import (
 	"errors"
 	"io/fs"
+	"net/http"
+	"net/http/httptest"
 	"os"
 	"path/filepath"
 	"testing"
@@ -16,25 +18,36 @@ import (
 )
 
 func TestDo(t *testing.T) {
+	var (
+		svc   = httptest.NewServer(http.HandlerFunc(func(_ http.ResponseWriter, _ *http.Request) {}))
+		input = filepath.Join(t.TempDir(), t.Name())
+	)
+
+	defer svc.Close()
+
 	env, err := env.Mock(t.Name(), t.TempDir())
 	if err != nil {
-		t.Errorf("env mock error: %v", err)
+		t.Errorf("env mock err %v", err)
 	}
+
+	env.Cfg.Secrets.Submit.Endpoint = svc.URL
 
 	if err := db.Load(env); err != nil {
-		t.Fatalf("db load error: %s", err)
+		t.Fatalf("db load err %s", err)
 	}
 
-	path := filepath.Join(t.TempDir(), t.Name())
-
-	file, err := os.Create(path)
+	file, err := os.Create(input)
 	if err != nil {
-		t.Fatal("file create error:", err)
+		t.Fatal("file create err", err)
 	}
-	defer file.Close()
 
-	if err := Do(env, []string{path}); err != nil {
-		t.Errorf("submit error: %v", err)
+	defer func() {
+		// lint
+		_ = file.Close()
+	}()
+
+	if got := Do(env, []string{input}); got != nil {
+		t.Errorf("do err %v", got)
 	}
 }
 
@@ -88,11 +101,11 @@ func TestDoInvalidPath(t *testing.T) {
 		t.Run(name, func(t *testing.T) {
 			env, err := env.Mock(t.Name(), t.TempDir())
 			if err != nil {
-				t.Errorf("env mock error: %v", err)
+				t.Errorf("env mock err %v", err)
 			}
 
-			if err := Do(env, test.input); !errors.Is(err, test.want) {
-				t.Errorf("unexpected submit result %v, want %v", err, test.want)
+			if got := Do(env, test.input); !errors.Is(got, test.want) {
+				t.Errorf("unexpected do result %v, want %v", got, test.want)
 			}
 		})
 	}
@@ -106,10 +119,10 @@ func TestDoErrs(t *testing.T) {
 
 	env, err := env.Mock(t.Name(), t.TempDir())
 	if err != nil {
-		t.Errorf("env mock error: %v", err)
+		t.Errorf("env mock err %v", err)
 	}
 
-	if err := Do(env, input); !errors.Is(err, want) {
-		t.Errorf("unexpected submit err %v, want %v", err, want)
+	if got := Do(env, input); !errors.Is(got, want) {
+		t.Errorf("unexpected submit err %v, want %v", got, want)
 	}
 }

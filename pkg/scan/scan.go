@@ -7,9 +7,10 @@ import (
 	"context"
 	"fmt"
 	"log/slog"
-	"os"
 	"path/filepath"
 	"time"
+
+	"golang.org/x/sys/unix"
 
 	"github.com/defended-net/malwatch/pkg/boot/env"
 	"github.com/defended-net/malwatch/pkg/boot/env/cfg/act"
@@ -140,9 +141,15 @@ func Group(paths []string) map[string]*job.Paths {
 	grouped := map[string]*job.Paths{}
 
 	for _, path := range paths {
-		stat, err := os.Stat(path)
-		if err != nil {
+		stat := &unix.Stat_t{}
+
+		if err := unix.Lstat(path, stat); err != nil {
 			slog.Error(fsys.ErrStat.Error(), "path", path)
+
+			continue
+		}
+
+		if stat.Mode&unix.S_IFMT == unix.S_IFLNK {
 			continue
 		}
 
@@ -152,8 +159,9 @@ func Group(paths []string) map[string]*job.Paths {
 			grouped[target] = &job.Paths{}
 		}
 
-		if stat.IsDir() {
+		if stat.Mode&unix.S_IFMT == unix.S_IFDIR {
 			grouped[target].Dirs = append(grouped[target].Dirs, path)
+
 			continue
 		}
 

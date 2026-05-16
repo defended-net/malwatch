@@ -11,7 +11,7 @@ import (
 	"github.com/defended-net/malwatch/pkg/scan/state"
 )
 
-func TestHitGet(t *testing.T) {
+func TestGet(t *testing.T) {
 	var (
 		want = &state.Hit{
 			Path: t.TempDir(),
@@ -26,11 +26,11 @@ func TestHitGet(t *testing.T) {
 	got := hits.Get(false)
 
 	if !slices.Equal(got, []*state.Hit{want}) {
-		t.Errorf("unexpected hits get result %v, want %v", got, want)
+		t.Errorf("unexpected get result %v, want %v", got, want)
 	}
 }
 
-func TestHitAdd(t *testing.T) {
+func TestAdd(t *testing.T) {
 	var (
 		want = &state.Hit{
 			Path: t.TempDir(),
@@ -45,6 +45,6 @@ func TestHitAdd(t *testing.T) {
 	got := hits.Get(false)
 
 	if !slices.Equal(got, []*state.Hit{want}) {
-		t.Errorf("unexpected hits add result %v, want %v", got, want)
+		t.Errorf("unexpected add result %v, want %v", got, want)
 	}
 }

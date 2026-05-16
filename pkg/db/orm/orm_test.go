@@ -12,79 +12,85 @@ import (
 func TestGet(t *testing.T) {
 	db, err := Mock(filepath.Join(t.TempDir(), t.Name()))
 	if err != nil {
-		t.Fatalf("db mock error: %s", err)
+		t.Fatalf("db mock err %s", err)
 	}
 
 	input := struct{}{}
 
 	if err := Put(db, "hits", t.Name(), input); err != nil {
-		t.Fatalf("put error: %s", err)
+		t.Fatalf("put err %s", err)
 	}
 
-	if _, err = Get(db, "hits", t.Name()); err != nil {
-		t.Errorf("get error: %v", err)
+	if _, got := Get(db, "hits", t.Name()); got != nil {
+		t.Errorf("get err %v", got)
 	}
 }
 
 func TestGetAll(t *testing.T) {
 	db, err := Mock(filepath.Join(t.TempDir(), t.Name()))
 	if err != nil {
-		t.Fatalf("db mock error: %s", err)
+		t.Fatalf("db mock err %s", err)
 	}
 
 	input := struct{}{}
 
 	if err := Put(db, "hits", t.Name(), input); err != nil {
-		t.Fatalf("put error: %s", err)
+		t.Fatalf("put err %s", err)
 	}
 
-	if _, err = GetAll(db, "hits"); err != nil {
-		t.Errorf("get all error: %v", err)
+	if _, got := GetAll(db, "hits"); got != nil {
+		t.Errorf("get all err %v", got)
 	}
 }
 
 func TestGetErrs(t *testing.T) {
+	want := ErrTxBktNotFound
+
 	db, err := Mock(filepath.Join(t.TempDir(), t.Name()))
 	if err != nil {
-		t.Fatalf("db mock error: %s", err)
+		t.Fatalf("db mock err %s", err)
 	}
 
-	if _, err = Get(db, t.Name(), t.Name()); !errors.Is(err, ErrTxBktNotFound) {
-		t.Errorf("unexpected get error: %v, want %v", err, ErrTxBktNotFound)
+	if _, got := Get(db, t.Name(), t.Name()); !errors.Is(got, want) {
+		t.Errorf("unexpected get err %v, want %v", got, want)
 	}
 }
 
 func TestGetAllErrs(t *testing.T) {
+	want := ErrBktIter
+
 	db, err := Mock(filepath.Join(t.TempDir(), t.Name()))
 	if err != nil {
-		t.Fatalf("db mock error: %s", err)
+		t.Fatalf("db mock err %s", err)
 	}
 
-	if _, err = GetAll(db, t.Name()); !errors.Is(err, ErrBktIter) {
-		t.Errorf("unexpected get error: %v, want %v", err, ErrBktIter)
+	if _, got := GetAll(db, t.Name()); !errors.Is(got, want) {
+		t.Errorf("unexpected get all err %v, want %v", got, want)
 	}
 }
 
 func TestPutErrs(t *testing.T) {
+	want := ErrTxBktNotFound
+
 	db, err := Mock(filepath.Join(t.TempDir(), t.Name()))
 	if err != nil {
-		t.Fatalf("db mock error: %s", err)
+		t.Fatalf("db mock err %s", err)
 	}
 
-	if err = Put(db, t.Name(), t.Name(), nil); !errors.Is(err, ErrTxBktNotFound) {
-		t.Errorf("unexpected get error: %v, want %v", err, ErrTxBktNotFound)
+	if got := Put(db, t.Name(), t.Name(), nil); !errors.Is(got, want) {
+		t.Errorf("unexpected put err %v, want %v", got, want)
 	}
 }
 
 func TestPutUnsupported(t *testing.T) {
-	db, err := Mock(filepath.Join(t.TempDir(), t.Name()))
-	if err != nil {
-		t.Fatalf("db mock error: %s", err)
-	}
-
 	want := "unsupported type: chan string"
 
-	if err = Put(db, "hits", t.Name(), make(chan string)); !errors.Is(err, ErrMarshal) {
-		t.Errorf("unexpected get error: %v, want %v", err, want)
+	db, err := Mock(filepath.Join(t.TempDir(), t.Name()))
+	if err != nil {
+		t.Fatalf("db mock err %s", err)
+	}
+
+	if got := Put(db, "hits", t.Name(), make(chan string)); !errors.Is(got, ErrMarshal) {
+		t.Errorf("unexpected put err %v, want %v", got, want)
 	}
 }

@@ -47,10 +47,10 @@ func Set(env *env.Env, args []string) error {
 	)
 
 	if parsed.path != "" {
-		return env.Cfg.Acts.SetPathVerbs(acters, parsed.path, parsed.rule, parsed.verbs)
+		return env.Cfg.Acts.SetPathVerbs(env.Paths.Install.Root, acters, parsed.path, parsed.rule, parsed.verbs)
 	}
 
-	return env.Cfg.Acts.SetSigVerbs(acters, parsed.key, parsed.verbs)
+	return env.Cfg.Acts.SetSigVerbs(env.Paths.Install.Root, acters, parsed.key, parsed.verbs)
 }
 
 // Del deletes acts for path or rule name.
@@ -59,10 +59,10 @@ func Del(env *env.Env, args []string) error {
 	parsed := Parse(args)
 
 	if parsed.path != "" {
-		return env.Cfg.Acts.DelPathVerbs(parsed.path)
+		return env.Cfg.Acts.DelPathVerbs(env.Paths.Install.Root, parsed.path)
 	}
 
-	return env.Cfg.Acts.DelSigVerbs(parsed.key)
+	return env.Cfg.Acts.DelSigVerbs(env.Paths.Install.Root, parsed.key)
 }
 
 // Parse parses cli args. A key from first arg determines if path or rule name was specified.

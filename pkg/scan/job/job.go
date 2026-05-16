@@ -61,7 +61,6 @@ func New(target string, paths *Paths, timeout time.Duration, batchSz int, acters
 }
 
 // Walk traverses paths for given job.
-// File counting done here in single thread to avoid lock contention from workers handling it.
 func (job *Job) Walk(skips *act.Skips, sz int) <-chan string {
 	queue := make(chan string, sz)
 
@@ -72,12 +71,14 @@ func (job *Job) Walk(skips *act.Skips, sz int) <-chan string {
 			if err := filepath.WalkDir(entry, func(path string, info os.DirEntry, err error) error {
 				switch {
 				case err != nil:
+					job.State.AddErr(err)
+
 					return nil
 
 				case fsys.IsRel(path, skips.Dirs...):
 					return filepath.SkipDir
 
-				case skips.Files[path] != struct{}{}:
+				case skips.HasFile(path):
 					return nil
 
 				case !info.Type().IsRegular():

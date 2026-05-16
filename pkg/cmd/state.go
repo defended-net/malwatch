@@ -12,6 +12,10 @@ import (
 	"os"
 	"strings"
 	"sync"
+
+	"golang.org/x/sys/unix"
+
+	"github.com/defended-net/malwatch/pkg/fsys"
 )
 
 // https://tldp.org/LDP/abs/html/exitcodes.html
@@ -19,9 +23,12 @@ import (
 // https://en.wikipedia.org/wiki/Exit_status#POSIX
 
 // State represents proc state. Cancel stores goroutine cancel fns.
+// LockRoot and LockName are canonical handles for cleanup.
 type State struct {
 	Exit     status
-	Lockfile string
+	LockPath string
+	LockName string
+	LockRoot *os.Root       `json:"-"`
 	Signal   chan os.Signal `json:"-"`
 	Cancel   *Cancel        `json:"-"`
 }
@@ -81,9 +88,9 @@ func Exit(state *State, err error) {
 			}
 
 			// Listen fn might have already removed the lockfile. Which is fine.
-			if state.Lockfile != "" {
-				if err := os.Remove(state.Lockfile); err != nil && !errors.Is(err, fs.ErrNotExist) {
-					slog.Error(ErrLockDel.Error(), "path", state.Lockfile)
+			if state.LockRoot != nil && state.LockName != "" {
+				if err := state.LockRoot.Remove(state.LockName); err != nil {
+					slog.Error(ErrLockDel.Error(), "path", state.LockPath, "msg", err)
 				}
 			}
 
@@ -101,18 +108,33 @@ func Exit(state *State, err error) {
 }
 
 // Lock checks exclusivity to create the lockfile if available.
-func (state *State) Lock(path string) error {
-	if _, err := os.Stat(path); err == nil {
-		return fmt.Errorf("%w, %v", ErrLockExists, path)
+func (state *State) Lock(root *os.Root, path string) error {
+	if root == nil {
+		return fsys.ErrPathInvalid
 	}
 
-	file, err := os.OpenFile(path, os.O_CREATE|os.O_EXCL|os.O_WRONLY, 0600)
+	name, err := fsys.RootName(root, path)
 	if err != nil {
+		return err
+	}
+
+	file, err := root.OpenFile(name, unix.O_CREAT|unix.O_EXCL|unix.O_WRONLY, 0600)
+	if err != nil {
+		if errors.Is(err, fs.ErrExist) {
+			return fmt.Errorf("%w, %v", ErrLockExists, path)
+		}
+
 		return fmt.Errorf("%w, %v, %v", ErrLockCreate, err, path)
 	}
-	defer file.Close()
+	defer fsys.Close(file)
 
-	state.Lockfile = path
+	if _, err := fmt.Fprintf(file, "%d", os.Getpid()); err != nil {
+		return fmt.Errorf("%w, %v, %v", ErrLockCreate, err, path)
+	}
+
+	state.LockRoot = root
+	state.LockName = name
+	state.LockPath = path
 
 	return nil
 }

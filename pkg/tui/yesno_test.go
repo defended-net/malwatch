@@ -51,12 +51,10 @@ func TestYesNo(t *testing.T) {
 
 	for name, test := range tests {
 		t.Run(name, func(t *testing.T) {
-			reader := strings.NewReader(test.input)
+			rdr := strings.NewReader(test.input)
 
-			got := YesNo(t.Name(), reader)
-
-			if got != test.want {
-				t.Fatalf("unexpected yesno val want %v", test.want)
+			if got := YesNo(t.Name(), rdr); got != test.want {
+				t.Fatalf("unexpected yesno result %v, want %v", got, test.want)
 			}
 		})
 	}

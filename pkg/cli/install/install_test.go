@@ -19,13 +19,13 @@ func TestDo(t *testing.T) {
 		},
 	}
 
-	if err := Do(env, []string{""}); err != nil {
-		t.Errorf("install do error: %v", err)
+	if got := Do(env, []string{""}); got != nil {
+		t.Errorf("install do err %v", got)
 	}
 }
 
 func TestDoNoArgs(t *testing.T) {
-	if err := Do(nil, nil); err != nil {
-		t.Errorf("install do error: %v", err)
+	if got := Do(nil, nil); got != nil {
+		t.Errorf("install do err %v", got)
 	}
 }

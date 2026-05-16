@@ -25,18 +25,18 @@ import (
 func TestStart(t *testing.T) {
 	env, err := env.Mock(t.Name(), t.TempDir())
 	if err != nil {
-		t.Fatalf("env mock error: %v", err)
+		t.Fatalf("env mock err %v", err)
 	}
 
 	if err := sig.Mock(env, true); err != nil {
-		t.Fatalf("sig mock error: %v", err)
+		t.Fatalf("sig mock err %v", err)
 	}
 
 	job := New("target", &Paths{}, 0, 1, []acter.Acter{}, []func(*state.Result) error{}, true)
 
 	worker, err := worker.New(env.Cfg)
 	if err != nil {
-		t.Fatalf("worker create error: %v", err)
+		t.Fatalf("create worker err %v", err)
 	}
 
 	job.Start(context.Background(), &act.Skips{}, worker)
@@ -49,6 +49,7 @@ func TestStopBatch(t *testing.T) {
 		task = []func(*state.Result) error{
 			func(*state.Result) error {
 				_, err := os.Create(path)
+
 				return err
 			},
 		}
@@ -70,7 +71,7 @@ func TestStopBatch(t *testing.T) {
 
 	if _, err := os.Stat(path); err != nil {
 		if os.IsNotExist(err) {
-			t.Errorf("task flag file not found: %v", path)
+			t.Errorf("task flag file not found %v", path)
 		}
 	}
 }
@@ -78,11 +79,11 @@ func TestStopBatch(t *testing.T) {
 func TestStopNoHit(t *testing.T) {
 	env, err := env.Mock(t.Name(), t.TempDir())
 	if err != nil {
-		t.Fatalf("env mock error: %v", err)
+		t.Fatalf("env mock err %v", err)
 	}
 
 	if err := sig.Mock(env, true); err != nil {
-		t.Fatalf("sig mock error: %v", err)
+		t.Fatalf("sig mock err %v", err)
 	}
 
 	var (
@@ -91,6 +92,7 @@ func TestStopNoHit(t *testing.T) {
 		task = []func(*state.Result) error{
 			func(*state.Result) error {
 				_, err := os.Create(path)
+
 				return err
 			},
 		}
@@ -100,7 +102,7 @@ func TestStopNoHit(t *testing.T) {
 
 	worker, err := worker.New(env.Cfg)
 	if err != nil {
-		t.Fatalf("worker create error: %v", err)
+		t.Fatalf("worker create err %v", err)
 	}
 
 	job.Start(context.Background(), &act.Skips{}, worker)
@@ -108,28 +110,32 @@ func TestStopNoHit(t *testing.T) {
 	job.Stop()
 
 	if _, err := os.Stat(path); err == nil {
-		t.Errorf("task flag file should not exist: %v", path)
+		t.Errorf("task flag file should not exist %v", path)
 	} else if !os.IsNotExist(err) {
-		t.Fatalf("stat error: %v", err)
+		t.Fatalf("stat err %v", err)
 	}
 }
 
 func TestWalk(t *testing.T) {
 	var (
-		dir  = t.TempDir()
-		path = filepath.Join(dir, t.Name())
+		tmp  = t.TempDir()
+		path = filepath.Join(tmp, t.Name())
 
 		input = &Paths{
 			Files: []string{path},
-			Dirs:  []string{dir},
+			Dirs:  []string{tmp},
 		}
 	)
 
 	file, err := os.Create(path)
 	if err != nil {
-		t.Errorf("file create error: %v", err)
+		t.Errorf("file create err %v", err)
 	}
-	defer file.Close()
+
+	defer func() {
+		// lint
+		_ = file.Close()
+	}()
 
 	job := New("target", input, 0, 1, []acter.Acter{}, nil, true)
 
@@ -137,22 +143,24 @@ func TestWalk(t *testing.T) {
 }
 
 func TestNew(t *testing.T) {
-	got := New("target", &Paths{}, 0, 1, []acter.Acter{}, []func(*state.Result) error{}, true)
+	var (
+		got = New("target", &Paths{}, 0, 1, []acter.Acter{}, []func(*state.Result) error{}, true)
 
-	want := &Job{
-		Target:  "target",
-		State:   got.State,
-		paths:   got.paths,
-		timeout: 0,
-		batchSz: 1,
-		db:      got.db,
-		spinner: got.spinner,
-		acters:  []acter.Acter{},
-		tasks:   []func(*state.Result) error{},
-	}
+		want = &Job{
+			Target:  "target",
+			State:   got.State,
+			paths:   got.paths,
+			timeout: 0,
+			batchSz: 1,
+			db:      got.db,
+			spinner: got.spinner,
+			acters:  []acter.Acter{},
+			tasks:   []func(*state.Result) error{},
+		}
+	)
 
 	if !reflect.DeepEqual(got, want) {
-		t.Errorf("unexpected new job result %v, want %v", got, want)
+		t.Errorf("unexpected create job result %v, want %v", got, want)
 	}
 }
 
@@ -160,11 +168,11 @@ func TestActs(t *testing.T) {
 	var (
 		mock   = acter.Mock(t.Name(), true)
 		result = &state.Result{}
+
+		input = New("target", &Paths{}, 0, 1, []acter.Acter{mock}, []func(*state.Result) error{}, true)
 	)
 
-	job := New("target", &Paths{}, 0, 1, []acter.Acter{mock}, []func(*state.Result) error{}, true)
-
-	job.Acts(result)
+	input.Acts(result)
 }
 
 func TestTasks(t *testing.T) {
@@ -174,16 +182,14 @@ func TestTasks(t *testing.T) {
 		task = func(*state.Result) error {
 			return nil
 		}
+
+		input = New("target", &Paths{}, 0, 1, []acter.Acter{}, []func(*state.Result) error{task}, true)
 	)
 
-	job := New("target", &Paths{}, 0, 1, []acter.Acter{}, []func(*state.Result) error{task}, true)
+	input.Tasks(result)
 
-	job.Tasks(result)
-
-	got := result.Errs()
-
-	if len(got) > 0 {
-		t.Errorf("unexpected tasks errors %v", got)
+	if got := result.Errs(); len(got) > 0 {
+		t.Errorf("unexpected tasks errs %v", got)
 	}
 }
 
@@ -196,36 +202,35 @@ func TestTasksErr(t *testing.T) {
 				return io.EOF
 			},
 		}
-	)
 
-	job := New("target", &Paths{}, 0, 1, []acter.Acter{}, task, true)
+		input = New("target", &Paths{}, 0, 1, []acter.Acter{}, task, true)
 
-	job.Tasks(result)
-
-	var (
-		got  = result.Errs()
 		want = []error{io.EOF}
 	)
 
-	if !slices.Equal(got, []error{io.EOF}) {
-		t.Errorf("unexpected task errors result %v, want %v", got, want)
+	input.Tasks(result)
+
+	if got := result.Errs(); !slices.Equal(got, []error{io.EOF}) {
+		t.Errorf("unexpected task errs result %v, want %v", got, want)
 	}
 }
 
 func TestFilterAct(t *testing.T) {
-	want := state.NewResult(
-		"",
+	var (
+		want = state.NewResult(
+			"",
 
-		state.Paths{
-			t.TempDir(): &hit.Meta{
-				Acts: []string{
-					t.Name(),
+			state.Paths{
+				t.TempDir(): &hit.Meta{
+					Acts: []string{
+						t.Name(),
+					},
 				},
 			},
-		},
-	)
+		)
 
-	got := FilterAct(want, t.Name())
+		got = FilterAct(want, t.Name())
+	)
 
 	if !reflect.DeepEqual(got, want) {
 		t.Errorf("unexpected filter act result %v, want %v", got, want)

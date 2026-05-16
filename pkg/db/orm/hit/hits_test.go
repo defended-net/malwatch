@@ -22,44 +22,45 @@ import (
 func TestNewMeta(t *testing.T) {
 	file, err := os.OpenFile(filepath.Join(t.TempDir(), t.Name()), os.O_CREATE, 0600)
 	if err != nil {
-		t.Fatalf("file write error: %v", err)
+		t.Fatalf("file write err %v", err)
 	}
 
 	stat := &unix.Stat_t{}
 
 	if err := unix.Stat(file.Name(), stat); err != nil {
-		t.Fatalf("stat error: %v", err)
+		t.Fatalf("stat err %v", err)
 	}
 
-	want := &Meta{
-		Rules: []string{"eicar"},
-		Attr:  fsys.NewAttr(stat),
-		Acts:  []string{"alert"},
-	}
+	var (
+		want = &Meta{
+			Rules: []string{"eicar"},
+			Attr:  fsys.NewAttr(stat),
+			Acts:  []string{"alert"},
+		}
 
-	result := NewMeta(fsys.NewAttr(stat), []string{"eicar"}, "alert")
+		got = NewMeta(fsys.NewAttr(stat), []string{"eicar"}, "alert")
+	)
 
-	want.Time = result.Time
+	want.Time = got.Time
 
-	if !reflect.DeepEqual(result, want) {
-		t.Errorf("unexpected save file hit result %v, want %v", result, want)
+	if !reflect.DeepEqual(got, want) {
+		t.Errorf("unexpected save file hit result %v, want %v", got, want)
 	}
 }
 
 func TestSaveZeroLength(t *testing.T) {
 	input := &History{
 		Target: "target",
-
-		Paths: Paths{},
+		Paths:  Paths{},
 	}
 
 	db, err := orm.Mock(filepath.Join(t.TempDir(), t.Name()))
 	if err != nil {
-		t.Fatalf("db mock error: %s", err)
+		t.Fatalf("db mock err %s", err)
 	}
 
-	if err := input.Save(db); err != nil {
-		t.Errorf("save error: %v", err)
+	if got := input.Save(db); got != nil {
+		t.Errorf("save err %v", got)
 	}
 }
 
@@ -112,20 +113,20 @@ func TestSelectAll(t *testing.T) {
 
 	db, err := orm.Mock(filepath.Join(t.TempDir(), t.Name()))
 	if err != nil {
-		t.Fatalf("db mock error: %s", err)
+		t.Fatalf("db mock err %s", err)
 	}
 
 	if err := input.Save(db); err != nil {
-		t.Fatalf("save file hit error: %v", err)
+		t.Fatalf("save err %v", err)
 	}
 
-	hits, err := SelectAll(db)
+	got, err := SelectAll(db)
 	if err != nil {
-		t.Fatalf("select all hits error: %v", err)
+		t.Fatalf("select all err %v", err)
 	}
 
-	if !reflect.DeepEqual(hits, want) {
-		t.Errorf("unexpected select all hits result %v, want %v", hits, want)
+	if !reflect.DeepEqual(got, want) {
+		t.Errorf("unexpected select all result %v, want %v", got, want)
 	}
 }
 
@@ -177,32 +178,32 @@ func TestSelectTarget(t *testing.T) {
 
 	db, err := orm.Mock(filepath.Join(t.TempDir(), t.Name()))
 	if err != nil {
-		t.Fatalf("db mock error: %s", err)
+		t.Fatalf("db mock err %s", err)
 	}
 
 	for name, test := range tests {
 		t.Run(name, func(t *testing.T) {
 			for _, hit := range test.input {
 				if err := hit.Save(db); err != nil {
-					t.Fatalf("db save file hit error: %v", err)
+					t.Fatalf("db save err %v", err)
 				}
 			}
 
-			result, err := SelectTarget(db, name)
+			got, err := SelectTarget(db, name)
 			if err != nil {
-				t.Fatalf("select target hits lookup error: %v", err)
+				t.Fatalf("select target err %v", err)
 			}
 
-			if len(result) != test.want {
-				t.Errorf("unexpected select target hits result %v, want %v", len(result), test.want)
+			if len(got) != test.want {
+				t.Errorf("unexpected select target result %v, want %v", len(got), test.want)
 			}
 		})
 	}
 }
 
 func TestSelectAllNoDb(t *testing.T) {
-	if _, err := SelectAll(nil); err == nil {
-		t.Errorf("unexpected select all no db success: %v", err)
+	if _, got := SelectAll(nil); got == nil {
+		t.Errorf("unexpected select all success")
 	}
 }
 
@@ -214,7 +215,7 @@ func TestHasValidPaths(t *testing.T) {
 	}{
 		"not-abs": {
 			input: "../path",
-			want:  fsys.ErrPathTravers,
+			want:  fsys.ErrPathTraverse,
 		},
 
 		"root-path": {
@@ -230,8 +231,8 @@ func TestHasValidPaths(t *testing.T) {
 
 	for name, test := range tests {
 		t.Run(name, func(t *testing.T) {
-			if err := fsys.HasDotDots(test.input); !errors.Is(err, test.want) {
-				t.Errorf("unexpected has valid paths result %v, want %v", err, test.want)
+			if got := fsys.HasDotDots(test.input); !errors.Is(got, test.want) {
+				t.Errorf("unexpected has dot dots result %v, want %v", got, test.want)
 			}
 		})
 	}
@@ -259,12 +260,12 @@ func TestUpdateHits(t *testing.T) {
 
 	db, err := orm.Mock(filepath.Join(t.TempDir(), t.Name()))
 	if err != nil {
-		t.Fatalf("db mock error: %s", err)
+		t.Fatalf("db mock err %s", err)
 	}
 
 	for _, hit := range input {
-		if err := hit.Save(db); err != nil {
-			t.Errorf("update error: %v", err)
+		if got := hit.Save(db); got != nil {
+			t.Errorf("update err %v", got)
 		}
 	}
 }
@@ -272,7 +273,7 @@ func TestUpdateHits(t *testing.T) {
 func TestDelTarget(t *testing.T) {
 	db, err := orm.Mock(filepath.Join(t.TempDir(), t.Name()))
 	if err != nil {
-		t.Fatalf("db mock error: %s", err)
+		t.Fatalf("db mock err %s", err)
 	}
 
 	hits := &History{
@@ -284,38 +285,38 @@ func TestDelTarget(t *testing.T) {
 	}
 
 	if err := hits.Save(db); err != nil {
-		t.Errorf("save error: %v", err)
+		t.Errorf("save err %v", err)
 	}
 
-	if err := DelTarget(db, "target"); err != nil {
-		t.Errorf("del error: %v", err)
+	if got := DelTarget(db, "target"); got != nil {
+		t.Errorf("del err %v", got)
 	}
 }
 
 func TestDelPath(t *testing.T) {
 	var (
-		path = t.TempDir()
+		tmp = t.TempDir()
 
 		hits = &History{
 			Target: "target",
 
 			Paths: Paths{
-				path: {},
+				tmp: {},
 			},
 		}
 	)
 
 	db, err := orm.Mock(filepath.Join(t.TempDir(), t.Name()))
 	if err != nil {
-		t.Fatalf("db mock error: %s", err)
+		t.Fatalf("db mock err %s", err)
 	}
 
 	if err := hits.Save(db); err != nil {
-		t.Fatalf("save error: %v", err)
+		t.Fatalf("save err %v", err)
 	}
 
-	if err := DelPath(db, "target", path); err != nil {
-		t.Errorf("del error: %v", err)
+	if got := DelPath(db, "target", tmp); got != nil {
+		t.Errorf("del err %v", got)
 	}
 }
 
@@ -358,46 +359,48 @@ func TestSelectLast(t *testing.T) {
 
 	db, err := orm.Mock(filepath.Join(t.TempDir(), t.Name()))
 	if err != nil {
-		t.Fatalf("db mock error: %s", err)
+		t.Fatalf("db mock err %s", err)
 	}
 
 	if err := hits.Save(db); err != nil {
-		t.Fatalf("save error: %v", err)
+		t.Fatalf("save err %v", err)
 	}
 
 	if err := update.Save(db); err != nil {
-		t.Fatalf("save error: %v", err)
+		t.Fatalf("save err %v", err)
 	}
 
-	result, err := SelectLast(db, "/path")
+	got, err := SelectLast(db, "/path")
 	if err != nil {
-		t.Fatalf("select last hit error: %v", err)
+		t.Fatalf("select last hit err %v", err)
 	}
 
-	if !reflect.DeepEqual(result.Rules, want.Rules) {
-		t.Errorf("unexpected select last hit result %v, want %v", result.Rules, want.Rules)
+	if !reflect.DeepEqual(got.Rules, want.Rules) {
+		t.Errorf("unexpected select last hit result %v, want %v", got.Rules, want.Rules)
 	}
 }
 
 func TestSelectLastHitNone(t *testing.T) {
 	input, err := orm.Mock(filepath.Join(t.TempDir(), t.Name()))
 	if err != nil {
-		t.Fatalf("db mock error: %s", err)
+		t.Fatalf("db mock err %s", err)
 	}
 
-	if _, err = SelectLast(input, "/path"); err != nil {
-		t.Errorf("unexpected select last hit error: %v", err)
+	if _, got := SelectLast(input, "/path"); got != nil {
+		t.Errorf("unexpected select last hit err %v", got)
 	}
 }
 
 func TestSelectLastHitErrs(t *testing.T) {
+	want := fsys.ErrPathNotAbs
+
 	input, err := orm.Mock(filepath.Join(t.TempDir(), t.Name()))
 	if err != nil {
-		t.Fatalf("db mock error: %s", err)
+		t.Fatalf("db mock err %s", err)
 	}
 
-	if _, err := SelectLast(input, "../path"); !errors.Is(err, fsys.ErrPathNotAbs) {
-		t.Errorf("select last hit error: %v", err)
+	if _, got := SelectLast(input, "../path"); !errors.Is(got, want) {
+		t.Errorf("unexpected select last hit err %v, want %v", got, want)
 	}
 }
 
@@ -409,12 +412,12 @@ func TestRestore(t *testing.T) {
 	)
 
 	if err := os.MkdirAll(filepath.Join(quarantineDir, srcDir), 0700); err != nil {
-		t.Errorf("quarantine dir create error: %v", err)
+		t.Errorf("quarantine dir create err %v", err)
 	}
 
 	dst, err := os.Create(filepath.Join(quarantineDir, srcDir, t.Name()+"-quarantined"))
 	if err != nil {
-		t.Errorf("file create error: %v", err)
+		t.Errorf("file create err %v", err)
 	}
 
 	hit := &History{
@@ -432,28 +435,32 @@ func TestRestore(t *testing.T) {
 		},
 	}
 
-	if err := hit.Paths[srcPath][0].Restore(quarantineDir, srcPath); err != nil {
-		t.Errorf("restore error: %v", err)
+	if got := hit.Paths[srcPath][0].Restore(quarantineDir, srcPath); got != nil {
+		t.Errorf("restore err %v", got)
 	}
 }
 
 func TestRestoreErrs(t *testing.T) {
-	input := &Meta{
-		Status: "/path",
-		Attr:   &fsys.Attr{},
-	}
+	var (
+		input = &Meta{
+			Status: "/path",
+			Attr:   &fsys.Attr{},
+		}
 
-	if err := input.Restore("../", filepath.Join(t.TempDir(), "../")); !errors.Is(err, fsys.ErrPathTravers) {
-		t.Errorf("restore error: %v", err)
+		want = fsys.ErrPathTraverse
+	)
+
+	if got := input.Restore("../", filepath.Join(t.TempDir(), "../")); !errors.Is(got, want) {
+		t.Errorf("unexpected restore err %v, want % v", got, want)
 	}
 }
 
 func TestPathsToSlice(t *testing.T) {
 	var (
-		dir = t.TempDir()
+		tmp = t.TempDir()
 
 		input = Paths{
-			dir: []*Meta{
+			tmp: []*Meta{
 				{},
 			},
 		}
@@ -461,7 +468,7 @@ func TestPathsToSlice(t *testing.T) {
 		got = input.ToSlice()
 
 		want = [][]string{
-			input[dir][0].ToSlice(dir),
+			input[tmp][0].ToSlice(tmp),
 		}
 	)
 
@@ -472,7 +479,7 @@ func TestPathsToSlice(t *testing.T) {
 
 func TestMetaToSlice(t *testing.T) {
 	var (
-		dir  = t.TempDir()
+		tmp  = t.TempDir()
 		time = time.Now()
 
 		input = &Meta{
@@ -483,10 +490,10 @@ func TestMetaToSlice(t *testing.T) {
 			},
 		}
 
-		got = input.ToSlice(dir)
+		got = input.ToSlice(tmp)
 
 		want = []string{
-			dir,
+			tmp,
 			time.UTC().Format(tzFmt),
 			strings.Join([]string{}, "\n"),
 			time.Format(tzFmt),
@@ -505,13 +512,13 @@ func TestMetaToSlice(t *testing.T) {
 
 func TestHistoryToSlice(t *testing.T) {
 	var (
-		dir = t.TempDir()
+		tmp = t.TempDir()
 
 		input = &History{
 			Target: "target",
 
 			Paths: Paths{
-				dir: []*Meta{
+				tmp: []*Meta{
 					{},
 				},
 			},
@@ -521,7 +528,7 @@ func TestHistoryToSlice(t *testing.T) {
 
 		want = [][]string{
 			{
-				dir,
+				tmp,
 				strings.Join([]string{}, "\n"),
 				strings.Join([]string{}, ",")},
 		}

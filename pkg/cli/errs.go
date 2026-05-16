@@ -11,4 +11,7 @@ var (
 
 	// ErrArgNone means no args.
 	ErrArgNone = errors.New("cli: no args specified")
+
+	// ErrPrint means no print err.
+	ErrPrint = errors.New("cli: print error")
 )

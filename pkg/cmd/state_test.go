@@ -13,6 +13,29 @@ import (
 	"testing"
 )
 
+func TestNewState(t *testing.T) {
+	var (
+		input = NewState()
+		want  = StatusOK
+	)
+
+	if input == nil {
+		t.Fatal("expected non nil state")
+	}
+
+	if input.Signal == nil {
+		t.Error("expected non nil chan")
+	}
+
+	if input.Cancel == nil {
+		t.Error("expected non nil cancel")
+	}
+
+	if input.Exit != want {
+		t.Errorf("unexpected exit status %v, want %v", input.Exit, want)
+	}
+}
+
 func TestSetStatus(t *testing.T) {
 	tests := map[string]struct {
 		start status
@@ -46,29 +69,33 @@ func TestSetStatus(t *testing.T) {
 
 	for name, test := range tests {
 		t.Run(name, func(t *testing.T) {
-			state := &State{Exit: test.start}
+			got := &State{
+				Exit: test.start,
+			}
 
-			SetStatus(state, test.input)
+			SetStatus(got, test.input)
 
-			if state.Exit != test.want {
-				t.Errorf("unexpected status: %v, want %v", state.Exit, test.want)
+			if got.Exit != test.want {
+				t.Errorf("unexpected status %v, want %v", got.Exit, test.want)
 			}
 		})
 	}
 }
 
 func TestCancelAll(t *testing.T) {
-	ctx, cancel := context.WithCancel(context.Background())
+	var (
+		ctx, cancel = context.WithCancel(context.Background())
 
-	state := &State{
-		Cancel: &Cancel{},
-	}
+		input = &State{
+			Cancel: &Cancel{},
+		}
+	)
 
-	state.AddCancel(cancel)
+	input.AddCancel(cancel)
 
-	state.CancelAll()
+	input.CancelAll()
 
-	if err := ctx.Done(); err == nil {
+	if got := ctx.Done(); got == nil {
 		t.Errorf("unexpected ctx success")
 	}
 }
@@ -88,6 +115,11 @@ func TestGetCode(t *testing.T) {
 			want:  StatusErrArg,
 		},
 
+		"nil": {
+			input: nil,
+			want:  StatusOK,
+		},
+
 		"err": {
 			input: io.EOF,
 			want:  StatusErr,
@@ -96,8 +128,8 @@ func TestGetCode(t *testing.T) {
 
 	for name, test := range tests {
 		t.Run(name, func(t *testing.T) {
-			if result := getStatus(test.input); result != test.want {
-				t.Errorf("unexpected code: %v, want %v", result, test.want)
+			if got := getStatus(test.input); got != test.want {
+				t.Errorf("unexpected code: %v, want %v", got, test.want)
 			}
 		})
 	}
@@ -121,12 +153,12 @@ func TestSetCode(t *testing.T) {
 
 	for name, test := range tests {
 		t.Run(name, func(t *testing.T) {
-			result := &State{}
+			got := &State{}
 
-			SetStatus(result, test.input)
+			SetStatus(got, test.input)
 
-			if result.Exit != test.want {
-				t.Errorf("unexpected code: %v, want %v", result.Exit, test.want)
+			if got.Exit != test.want {
+				t.Errorf("unexpected code: %v, want %v", got.Exit, test.want)
 			}
 		})
 	}
@@ -150,43 +182,71 @@ func TestSetCodeHit(t *testing.T) {
 
 	for name, test := range tests {
 		t.Run(name, func(t *testing.T) {
-			result := &State{}
+			got := &State{}
 
-			SetStatus(result, ErrHit)
+			SetStatus(got, ErrHit)
 
-			SetStatus(result, test.input)
+			SetStatus(got, test.input)
 
-			if result.Exit != test.want {
-				t.Errorf("unexpected code: %v, want %v", result.Exit, test.want)
+			if got.Exit != test.want {
+				t.Errorf("unexpected code: %v, want %v", got.Exit, test.want)
 			}
 		})
 	}
 }
 
 func TestLock(t *testing.T) {
-	input := &State{
-		Lockfile: filepath.Join(t.TempDir(), t.Name()),
+	tmp := t.TempDir()
+
+	root, err := os.OpenRoot(tmp)
+	if err != nil {
+		t.Errorf("open root error %v", err)
 	}
 
-	if err := input.Lock(input.Lockfile); err != nil {
-		t.Errorf("lockfile lock error: %v", err)
+	defer func() {
+		//lint
+		_ = root.Close()
+	}()
+
+	input := &State{
+		LockPath: filepath.Join(tmp, t.Name()),
+	}
+
+	if got := input.Lock(root, input.LockPath); got != nil {
+		t.Errorf("lock error %v", got)
+	}
+
+	if input.LockName == "" || input.LockRoot != root {
+		t.Errorf("unexpected lock root/name population")
 	}
 }
 
 func TestLockExist(t *testing.T) {
 	if os.Getenv(t.Name()) == "1" {
-		input := &State{
-			Lockfile: filepath.Join(t.TempDir(), t.Name()),
-		}
-
-		file, err := os.Create(input.Lockfile)
+		root, err := os.OpenRoot(t.TempDir())
 		if err != nil {
-			t.Fatalf("lockfile create error: %v", err)
+			t.Errorf("open root error %v", err)
 		}
-		defer file.Close()
 
-		if err := input.Lock(input.Lockfile); err != nil {
-			t.Errorf("lock error: %v", err)
+		input := &State{
+			LockPath: filepath.Join(t.TempDir(), t.Name()),
+		}
+
+		file, err := os.Create(input.LockPath)
+		if err != nil {
+			t.Fatalf("lockfile create error %v", err)
+		}
+
+		defer func() {
+			//lint
+			_ = root.Close()
+
+			//lint
+			_ = file.Close()
+		}()
+
+		if got := input.Lock(root, input.LockPath); got != nil {
+			t.Errorf("lock error %v", got)
 		}
 
 		return
@@ -205,11 +265,70 @@ func TestLockExist(t *testing.T) {
 	}
 }
 
+func TestLockCreateErr(t *testing.T) {
+	var (
+		tmp   = t.TempDir()
+		input = &State{}
+		path  = filepath.Join(tmp, t.Name(), "lock")
+	)
+
+	root, err := os.OpenRoot(tmp)
+	if err != nil {
+		t.Errorf("open root error %v", err)
+	}
+
+	defer func() {
+		//lint
+		_ = root.Close()
+	}()
+
+	got := input.Lock(root, path)
+
+	if got == nil {
+		t.Fatal("expected lock create error")
+	}
+
+	if !errors.Is(got, ErrLockCreate) {
+		t.Errorf("unexpected error %v, want %v", got, ErrLockCreate)
+	}
+}
+
+func TestGetCancels(t *testing.T) {
+	var (
+		state = &State{
+			Cancel: &Cancel{},
+		}
+
+		_, cancel1 = context.WithCancel(context.Background())
+		_, cancel2 = context.WithCancel(context.Background())
+	)
+
+	state.AddCancel(cancel1)
+	state.AddCancel(cancel2)
+
+	got := state.GetCancels()
+
+	if len(got) != 2 {
+		t.Errorf("unexpected cancel count: %v, want 2", len(got))
+	}
+
+	got = state.GetCancels()
+
+	if len(got) != 0 {
+		t.Errorf("expected empty cancels, got %v", len(got))
+	}
+}
+
 func TestExit(t *testing.T) {
 	tests := map[string]struct {
 		input error
 		want  int
 	}{
+		"TestExitNilState": {
+			input: io.EOF,
+			want:  int(StatusErr),
+		},
+
 		"TestStatusErr": {
 			input: io.ErrUnexpectedEOF,
 			want:  int(StatusErr),
@@ -224,6 +343,11 @@ func TestExit(t *testing.T) {
 			input: ErrHit,
 			want:  int(StatusHit),
 		},
+
+		"TestExitWithLockfile": {
+			input: io.EOF,
+			want:  int(StatusErr),
+		},
 	}
 
 	for name, test := range tests {
@@ -231,11 +355,19 @@ func TestExit(t *testing.T) {
 			cmd := exec.Command(os.Args[0], "-test.run="+name)
 			cmd.Env = append(os.Environ(), "SKIP=0")
 
-			if result, ok := cmd.Run().(*exec.ExitError); ok && result.ExitCode() != test.want {
-				t.Errorf("unexpected status: %v, want %v", result.ExitCode(), test.want)
+			if got, ok := cmd.Run().(*exec.ExitError); ok && got.ExitCode() != test.want {
+				t.Errorf("unexpected status: %v, want %v", got.ExitCode(), test.want)
 			}
 		})
 	}
+}
+
+func TestExitNilState(t *testing.T) {
+	if os.Getenv("SKIP") != "0" {
+		t.Skip()
+	}
+
+	Exit(nil, io.EOF)
 }
 
 func TestStatusErr(t *testing.T) {

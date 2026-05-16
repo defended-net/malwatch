@@ -39,13 +39,11 @@ func TestCmd(t *testing.T) {
 		}
 	)
 
-	// Args field is []string, will have to iteratively compare.
-
-	if got.Help != want.Help {
+	switch {
+	case got.Help != want.Help:
 		t.Errorf("unexpected cmd help result %v, want %v", got.Help, want.Help)
-	}
 
-	if got.Min != want.Min {
+	case got.Min != want.Min:
 		t.Errorf("unexpected cmd min result %v, want %v", got.Min, want.Min)
 	}
 

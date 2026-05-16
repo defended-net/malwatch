@@ -12,9 +12,23 @@ import (
 	"time"
 )
 
-func mock(dir string, name string) *State {
+func mock(t *testing.T, dir string, name string) *State {
+	t.Helper()
+
+	root, err := os.OpenRoot(dir)
+	if err != nil {
+		t.Fatalf("open root err %v", err)
+	}
+
+	t.Cleanup(func() {
+		//lint
+		_ = root.Close()
+	})
+
 	state := &State{
-		Lockfile: filepath.Join(dir, name),
+		LockPath: filepath.Join(dir, name),
+		LockName: name,
+		LockRoot: root,
 		Signal:   make(chan os.Signal, 1),
 		Cancel:   &Cancel{},
 	}
@@ -27,14 +41,14 @@ func mock(dir string, name string) *State {
 }
 
 func TestListenNoSig(t *testing.T) {
-	state := mock(t.TempDir(), t.Name())
+	state := mock(t, t.TempDir(), t.Name())
 
-	if _, err := os.Create(state.Lockfile); err != nil {
-		t.Fatalf("lockfile create error: %v", err)
+	if _, err := os.Create(state.LockPath); err != nil {
+		t.Fatalf("file create err %v", err)
 	}
 
-	if err := Listen(state); err != nil {
-		t.Fatalf("listen error: %v", err)
+	if got := Listen(state); got != nil {
+		t.Fatalf("listen err %v", got)
 	}
 
 	select {
@@ -42,12 +56,12 @@ func TestListenNoSig(t *testing.T) {
 		t.Errorf("unexpected signal received")
 
 	case <-time.After(time.Second * 3):
-		// Expected.
+		// ok
 	}
 }
 
 func TestListen(t *testing.T) {
-	state := mock(t.TempDir(), t.Name())
+	state := mock(t, t.TempDir(), t.Name())
 
 	_, cancel := context.WithCancel(context.Background())
 	state.AddCancel(cancel)
@@ -77,12 +91,12 @@ func TestListen(t *testing.T) {
 	}
 
 	for _, test := range tests {
-		if _, err := os.Create(state.Lockfile); err != nil {
-			t.Fatalf("lockfile create error: %v", err)
+		if _, err := os.Create(state.LockPath); err != nil {
+			t.Fatalf("file create err %v", err)
 		}
 
-		if err := Listen(state); err != nil {
-			t.Fatalf("listen error: %v", err)
+		if got := Listen(state); got != nil {
+			t.Fatalf("listen err %v", got)
 		}
 
 		go func() {
