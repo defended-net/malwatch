@@ -136,10 +136,7 @@ func Mock(path string) (*Cfg, error) {
 			Key:      "",
 		},
 
-		S3: &S3{
-			Endpoint: "localhost:9000",
-			Region:   "us-east-1",
-		},
+		S3: &S3{},
 
 		Git: []*Repo{
 			{
