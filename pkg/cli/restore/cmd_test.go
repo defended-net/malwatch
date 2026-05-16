@@ -22,17 +22,14 @@ func TestCmd(t *testing.T) {
 		got = Cmd()
 	)
 
-	// Args field is []string, will have to iteratively compare.
-
-	if got.Help != want.Help {
+	switch {
+	case got.Help != want.Help:
 		t.Errorf("unexpected cmd help result %v, want %v", got.Help, want.Help)
-	}
 
-	if got.Min != want.Min {
+	case got.Min != want.Min:
 		t.Errorf("unexpected cmd min result %v, want %v", got.Min, want.Min)
-	}
 
-	if fmt.Sprintf("%v", got.Fn) != fmt.Sprintf("%v", want.Fn) {
+	case fmt.Sprintf("%v", got.Fn) != fmt.Sprintf("%v", want.Fn):
 		t.Errorf("unexpected cmd fn result %v, want %v", got.Fn, want.Fn)
 	}
 }

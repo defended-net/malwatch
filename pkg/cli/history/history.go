@@ -23,7 +23,9 @@ func Get(env *env.Env, args []string) error {
 		}
 
 		if len(histories) == 0 {
-			return tbl.Print("", tbl.HdrAppHit, nil)
+			tbl.Print("", tbl.HdrAppHit, nil)
+
+			return nil
 		}
 
 		for _, history := range histories {
@@ -46,7 +48,9 @@ func Get(env *env.Env, args []string) error {
 			cells = [][]string{meta.ToSlice(path)}
 		}
 
-		return tbl.Print(target, tbl.HdrAppHit, cells)
+		tbl.Print(target, tbl.HdrAppHit, cells)
+
+		return nil
 
 	case len(args) == 1:
 		path := args[0]
@@ -56,7 +60,9 @@ func Get(env *env.Env, args []string) error {
 			return err
 		}
 
-		return tbl.Print(path, tbl.HdrAppHit, paths.ToSlice())
+		tbl.Print(path, tbl.HdrAppHit, paths.ToSlice())
+
+		return nil
 	}
 
 	return nil

@@ -6,6 +6,7 @@ package smtp
 import (
 	"encoding/json"
 	"log/slog"
+	"os"
 	"path/filepath"
 
 	vars "github.com/caarlos0/env/v11"
@@ -37,8 +38,8 @@ func New(env *env.Env) *Sender {
 }
 
 // Load loads alerter cfg files.
-func (sender *Sender) Load() error {
-	if err := sender.cfg.Load(); err != nil {
+func (sender *Sender) Load(root *os.Root) error {
+	if err := sender.cfg.Load(root); err != nil {
 		return err
 	}
 
@@ -46,7 +47,9 @@ func (sender *Sender) Load() error {
 		return acter.ErrDisabled
 	}
 
-	client, err := mail.NewClient(sender.secrets.Hostname,
+	client, err := mail.NewClient(
+		sender.secrets.Hostname,
+
 		mail.WithSMTPAuth(mail.SMTPAuthPlain),
 		mail.WithTLSPortPolicy(mail.TLSMandatory),
 		mail.WithUsername(sender.secrets.User),
@@ -104,9 +107,13 @@ func Mock(name string, dir string) (*Sender, error) {
 		return nil, err
 	}
 
-	client, err := mail.NewClient(sender.secrets.Hostname,
-		mail.WithSMTPAuth(mail.SMTPAuthPlain), mail.WithTLSPortPolicy(mail.TLSMandatory),
-		mail.WithUsername(sender.secrets.User), mail.WithPassword(sender.secrets.Pass),
+	client, err := mail.NewClient(
+		sender.secrets.Hostname,
+
+		mail.WithSMTPAuth(mail.SMTPAuthPlain),
+		mail.WithTLSPortPolicy(mail.TLSMandatory),
+		mail.WithUsername(sender.secrets.User),
+		mail.WithPassword(sender.secrets.Pass),
 	)
 	if err != nil {
 		return nil, err

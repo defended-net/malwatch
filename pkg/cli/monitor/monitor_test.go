@@ -18,21 +18,22 @@ import (
 func TestStart(t *testing.T) {
 	if os.Getuid() != 0 {
 		fmt.Println("monitor: tests require root")
+
 		return
 	}
 
 	_env, err := env.Mock(t.Name(), t.TempDir())
 	if err != nil {
-		t.Errorf("env mock error: %v", err)
+		t.Errorf("env mock err %v", err)
 	}
 
 	if err := sig.Mock(_env, true); err != nil {
-		t.Errorf("sig mock error: %v", err)
+		t.Errorf("sig mock err %v", err)
 	}
 
 	go func(env *env.Env) {
-		if err := Do(env, []string{}); !errors.Is(err, context.Canceled) {
-			t.Errorf("start error: %v", err)
+		if got := Do(env, []string{}); !errors.Is(got, context.Canceled) {
+			t.Errorf("do err %v", got)
 		}
 	}(_env)
 

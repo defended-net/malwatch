@@ -65,10 +65,8 @@ func TestRuleName(t *testing.T) {
 
 	for name, test := range tests {
 		t.Run(name, func(t *testing.T) {
-			result := yrName.MatchString(test.input)
-
-			if result != test.want {
-				t.Errorf("unexpected regex result %v, want %v", result, test.want)
+			if got := yrName.MatchString(test.input); got != test.want {
+				t.Errorf("unexpected regex result %v, want %v", got, test.want)
 			}
 		})
 	}
@@ -127,16 +125,14 @@ func TestTargets(t *testing.T) {
 
 	for name, test := range tests {
 		t.Run(name, func(t *testing.T) {
-			result := Target(test.input)
-
-			if result != test.want {
-				t.Errorf("unexpected regex match: %v, want %v", result, test.want)
+			if got := Target(test.input); got != test.want {
+				t.Errorf("unexpected regex result %v, want %v", got, test.want)
 			}
 		})
 	}
 }
 
-func TestIsValidRuleName(t *testing.T) {
+func TestIsValidYrName(t *testing.T) {
 	tests := map[string]struct {
 		input string
 		want  bool
@@ -189,32 +185,32 @@ func TestIsValidRuleName(t *testing.T) {
 
 	for name, test := range tests {
 		t.Run(name, func(t *testing.T) {
-			result := IsValidYrName(test.input)
-
-			if result != test.want {
-				t.Errorf("unexpected rule name validation: %v, want %v", result, test.want)
+			if got := IsValidYrName(test.input); got != test.want {
+				t.Errorf("unexpected rule name result %v, want %v", got, test.want)
 			}
 		})
 	}
 }
 
-func TestFindRuleName(t *testing.T) {
+func TestFindYrName(t *testing.T) {
 	want := t.Name()
 
 	if got := FindYrName(want); got != want {
-		t.Errorf("unexpected rule name result: %v, want %v", got, want)
+		t.Errorf("unexpected rule name result %v, want %v", got, want)
 	}
 }
 
 func TestSetTargets(t *testing.T) {
-	input := []*regexp.Regexp{
-		regexp.MustCompile(t.Name()),
-	}
+	var (
+		input = []*regexp.Regexp{
+			regexp.MustCompile(t.Name()),
+		}
 
-	want := []*regexp.Regexp{
-		targets[0],
-		input[0],
-	}
+		want = []*regexp.Regexp{
+			targets[0],
+			input[0],
+		}
+	)
 
 	if SetTargets(input...); !slices.Equal(targets, want) {
 		t.Errorf("unexpected target result %v, want %v", targets, want)

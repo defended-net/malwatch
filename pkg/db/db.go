@@ -5,7 +5,6 @@ package db
 
 import (
 	"fmt"
-	"os"
 	"path/filepath"
 
 	"go.etcd.io/bbolt"
@@ -25,8 +24,17 @@ func Load(env *env.Env) error {
 		return fmt.Errorf("%w, %v", fsys.ErrPathNotAbs, env.Cfg.Database.Dir)
 	}
 
-	if err := os.MkdirAll(env.Cfg.Database.Dir, 0700); err != nil {
+	dirName, err := fsys.RootName(env.Paths.Install.Root, env.Cfg.Database.Dir)
+	if err != nil {
+		return err
+	}
+
+	if err := env.Paths.Install.Root.MkdirAll(dirName, 0700); err != nil {
 		return fmt.Errorf("%w, %v, %v", fsys.ErrDirCreate, err, env.Cfg.Database.Dir)
+	}
+
+	if _, err := fsys.RootName(env.Paths.Install.Root, env.Paths.Install.Db); err != nil {
+		return err
 	}
 
 	db, err := bbolt.Open(env.Paths.Install.Db, 0600, nil)

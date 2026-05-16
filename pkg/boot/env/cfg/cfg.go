@@ -4,6 +4,7 @@
 package cfg
 
 import (
+	"os"
 	"path/filepath"
 
 	vars "github.com/caarlos0/env/v11"
@@ -16,7 +17,7 @@ import (
 
 // Cfg represents a cfg.
 type Cfg interface {
-	Load() error
+	Load(root *os.Root) error
 	Path() string
 }
 
@@ -33,7 +34,7 @@ func Load(env *env.Env) error {
 	}
 
 	for _, cfg := range cfgs {
-		if err := cfg.Load(); err != nil {
+		if err := cfg.Load(env.Paths.Install.Root); err != nil {
 			return err
 		}
 	}

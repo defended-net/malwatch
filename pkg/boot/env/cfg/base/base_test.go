@@ -13,25 +13,31 @@ import (
 )
 
 func TestNew(t *testing.T) {
-	want := t.TempDir()
+	var (
+		want = t.TempDir()
 
-	input := &path.Paths{
-		Install: &path.Install{},
+		input = &path.Paths{
+			Install: &path.Install{},
 
-		Cfg: &path.Cfg{
-			Base: want,
-		},
-	}
+			Cfg: &path.Cfg{
+				Base: want,
+			},
+		}
 
-	cfg := New(input)
+		got = New(input)
+	)
 
-	if cfg.path != want {
-		t.Errorf("unexpected cfg path result %v, want %v", cfg.path, want)
+	if got.path != want {
+		t.Errorf("unexpected path result %v, want %v", got.path, want)
 	}
 }
 
 func TestLoad(t *testing.T) {
-	mock := `Identifier = ""
+	var (
+		tmp  = t.TempDir()
+		path = filepath.Join(tmp, t.Name())
+
+		mock = `Identifier = ""
 Cores = 1
 Threads = 1
 
@@ -52,38 +58,47 @@ Threads = 1
   Dir = "/tmp"
   Verbose = false
 `
-
-	path := filepath.Join(t.TempDir(), t.Name())
+	)
 
 	if err := os.WriteFile(path, []byte(mock), 0600); err != nil {
-		t.Errorf("cfg write err: %v", err)
+		t.Errorf("file write err %v", err)
 	}
+
+	root, err := os.OpenRoot(tmp)
+	if err != nil {
+		t.Fatalf("open root err %v", err)
+	}
+
+	defer func() {
+		// lint
+		_ = root.Close()
+	}()
 
 	cfg := &Cfg{
 		path: path,
 	}
 
-	if err := cfg.Load(); err != nil {
-		t.Errorf("cfg load err: %v", err)
+	if got := cfg.Load(root); got != nil {
+		t.Errorf("load err %v", got)
 	}
 }
 
 func TestPath(t *testing.T) {
-	want := t.Name()
+	var (
+		want = t.Name()
 
-	cfg := &Cfg{
-		path: want,
-	}
+		input = &Cfg{
+			path: want,
+		}
+	)
 
-	got := cfg.Path()
-
-	if got != t.Name() {
-		t.Errorf("unexpected cfg path result %v, want %v", got, want)
+	if got := input.Path(); got != t.Name() {
+		t.Errorf("unexpected path result %v, want %v", got, want)
 	}
 }
 
 func TestIdentifier(t *testing.T) {
-	cfg := &Cfg{
+	input := &Cfg{
 		Identifier: "",
 
 		Scans: &scan.Cfg{
@@ -95,50 +110,52 @@ func TestIdentifier(t *testing.T) {
 
 	hostname, err := os.Hostname()
 	if err != nil {
-		t.Errorf("hostname lookup error %v", err)
+		t.Errorf("hostname err %v", err)
 	}
 
-	if err := cfg.Validate(); err != nil {
-		t.Errorf("cfg validate error %v", err)
+	if err := input.Validate(); err != nil {
+		t.Errorf("validate err %v", err)
 	}
 
-	if cfg.Identifier != hostname {
-		t.Errorf("unexpected identifier result %v, want %v", cfg.Identifier, hostname)
+	if input.Identifier != hostname {
+		t.Errorf("unexpected identifier result %v, want %v", input.Identifier, hostname)
 	}
 }
 
 func TestMock(t *testing.T) {
-	dir := t.TempDir()
+	var (
+		tmp = t.TempDir()
 
-	paths := &path.Paths{
-		Install: &path.Install{
-			Log: filepath.Join(dir, t.Name()+".log"),
-			Tmp: filepath.Join(dir, "tmp"),
-		},
+		paths = &path.Paths{
+			Install: &path.Install{
+				Log: filepath.Join(tmp, t.Name()+".log"),
+				Tmp: filepath.Join(tmp, "tmp"),
+			},
 
-		Cfg: &path.Cfg{
-			Dir:     dir,
-			Base:    filepath.Join(dir, "cfg", "cfg.toml"),
-			Secrets: filepath.Join(dir, "cfg", "secrets.toml"),
-			Acts:    filepath.Join(dir, "cfg", "actions.toml"),
-		},
+			Cfg: &path.Cfg{
+				Dir:     tmp,
+				Base:    filepath.Join(tmp, "cfg", "cfg.toml"),
+				Secrets: filepath.Join(tmp, "cfg", "secrets.toml"),
+				Acts:    filepath.Join(tmp, "cfg", "actions.toml"),
+			},
 
-		Plat: &path.Plat{
-			Dir: filepath.Join(dir, "cfg", "plat"),
-		},
+			Plat: &path.Plat{
+				Dir: filepath.Join(tmp, "cfg", "plat"),
+			},
 
-		Alerts: &path.Alerts{
-			Dir: filepath.Join(dir, "cfg", "alerts"),
-		},
+			Alerts: &path.Alerts{
+				Dir: filepath.Join(tmp, "cfg", "alerts"),
+			},
 
-		Sigs: &path.Sigs{
-			Dir: filepath.Join(dir, "sigs"),
-			Src: filepath.Join(dir, "sigs", "src"),
-			Tmp: filepath.Join(dir, "sigs", "tmp"),
-		},
-	}
+			Sigs: &path.Sigs{
+				Dir: filepath.Join(tmp, "sigs"),
+				Src: filepath.Join(tmp, "sigs", "src"),
+				Tmp: filepath.Join(tmp, "sigs", "tmp"),
+			},
+		}
+	)
 
-	if _, err := Mock(paths, dir); err != nil {
-		t.Errorf("cfg mock error %v", err)
+	if _, got := Mock(paths, tmp); got != nil {
+		t.Errorf("cfg mock err %v", got)
 	}
 }

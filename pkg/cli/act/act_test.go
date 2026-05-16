@@ -27,13 +27,13 @@ func TestGet(t *testing.T) {
 
 	env, err := env.Mock(t.Name(), t.TempDir())
 	if err != nil {
-		t.Fatalf("env mock error: %s", err)
+		t.Fatalf("env mock err %s", err)
 	}
 
 	for name, test := range tests {
 		t.Run(name, func(t *testing.T) {
-			if err := Get(env, test.input); err != nil {
-				t.Fatalf("get error: %s", err)
+			if got := Get(env, test.input); got != nil {
+				t.Fatalf("get err %s", got)
 			}
 		})
 	}
@@ -123,8 +123,10 @@ func TestSet(t *testing.T) {
 		t.Run(name, func(t *testing.T) {
 			env, err := env.Mock(t.Name(), t.TempDir())
 			if err != nil {
-				t.Fatalf("env mock error: %s", err)
+				t.Fatalf("env mock err %s", err)
 			}
+
+			env.Cfg.Acts = cfg.Mock("acts.toml")
 
 			env.Plat = plat.Mock([]acter.Acter{
 				act.NewExiler(env),
@@ -133,19 +135,19 @@ func TestSet(t *testing.T) {
 				act.NewAlerter(env),
 			}...)
 
-			if err := env.Plat.Load(); err != nil {
-				t.Fatalf("plat load error: %s", err)
+			if err := env.Plat.Load(env.Paths.Install.Root); err != nil {
+				t.Fatalf("plat load err %s", err)
 			}
 
-			if err := Set(env, test.input); err != nil {
-				t.Fatalf("set error: %s", err)
+			if got := Set(env, test.input); got != nil {
+				t.Fatalf("set err %s", got)
 			}
 
-			if !reflect.DeepEqual(env.Cfg.Acts.Paths, test.want.Paths) {
+			switch {
+			case !reflect.DeepEqual(env.Cfg.Acts.Paths, test.want.Paths):
 				t.Errorf("unexpected set path result %v, want %v", env.Cfg.Acts.Paths, test.want.Paths)
-			}
 
-			if !reflect.DeepEqual(env.Cfg.Acts.Signatures, test.want.Signatures) {
+			case !reflect.DeepEqual(env.Cfg.Acts.Signatures, test.want.Signatures):
 				t.Errorf("unexpected set rule result %v, want %v", env.Cfg.Acts.Signatures, test.want.Signatures)
 			}
 		})
@@ -209,21 +211,22 @@ func TestDel(t *testing.T) {
 		t.Run(name, func(t *testing.T) {
 			env, err := env.Mock(t.Name(), t.TempDir())
 			if err != nil {
-				t.Fatalf("env mock error: %s", err)
+				t.Fatalf("env mock err %s", err)
 			}
 
+			env.Cfg.Acts = cfg.Mock("acts.toml")
 			env.Cfg.Acts.Paths = test.cfg.Paths
 			env.Cfg.Acts.Signatures = test.cfg.Signatures
 
-			if err := Del(env, test.input); err != nil {
-				t.Fatalf("del error: %s", err)
+			if got := Del(env, test.input); got != nil {
+				t.Fatalf("del err %s", got)
 			}
 
-			if !reflect.DeepEqual(env.Cfg.Acts.Paths, test.want.Paths) {
+			switch {
+			case !reflect.DeepEqual(env.Cfg.Acts.Paths, test.want.Paths):
 				t.Errorf("unexpected add path result %v, want %v", env.Cfg.Acts.Paths, test.want.Paths)
-			}
 
-			if !reflect.DeepEqual(env.Cfg.Acts.Signatures, test.want.Signatures) {
+			case !reflect.DeepEqual(env.Cfg.Acts.Signatures, test.want.Signatures):
 				t.Errorf("unexpected add rule result %v, want %v", env.Cfg.Acts.Signatures, test.want.Signatures)
 			}
 		})
@@ -252,14 +255,12 @@ func TestDelErrs(t *testing.T) {
 
 	env, err := env.Mock(t.Name(), t.TempDir())
 	if err != nil {
-		t.Fatalf("env mock error: %s", err)
+		t.Fatalf("env mock err %s", err)
 	}
-
-	//	env.Cfg.Acts.SetPath(env.Paths.Cfg.Acts)
 
 	for name, test := range tests {
 		t.Run(name, func(t *testing.T) {
-			if err := Del(env, test.input); err == nil {
+			if got := Del(env, test.input); got == nil {
 				t.Fatalf("unexpected del success")
 			}
 		})
@@ -357,10 +358,8 @@ func TestParse(t *testing.T) {
 
 	for name, test := range tests {
 		t.Run(name, func(t *testing.T) {
-			result := Parse(test.input)
-
-			if !reflect.DeepEqual(result, test.want) {
-				t.Errorf("unexpected parse result %v, want %v", result, test.want)
+			if got := Parse(test.input); !reflect.DeepEqual(got, test.want) {
+				t.Errorf("unexpected parse result %v, want %v", got, test.want)
 			}
 		})
 	}

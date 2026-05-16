@@ -12,10 +12,10 @@ import (
 func TestLoad(t *testing.T) {
 	env, err := env.Mock(t.Name(), t.TempDir())
 	if err != nil {
-		t.Fatalf("env mock err: %v", err)
+		t.Fatalf("env mock err %v", err)
 	}
 
-	if err := Load(env); err != nil {
-		t.Errorf("load err: %v", err)
+	if got := Load(env); got != nil {
+		t.Errorf("load err %v", got)
 	}
 }

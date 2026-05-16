@@ -5,6 +5,7 @@ package act
 
 import (
 	"fmt"
+	"os"
 	"path/filepath"
 
 	"github.com/defended-net/malwatch/pkg/boot/env"
@@ -17,6 +18,7 @@ import (
 type Quarantiner struct {
 	verb string
 	dir  string
+	root *os.Root
 }
 
 // NewQuarantiner returns quarantiner for given env.
@@ -28,10 +30,17 @@ func NewQuarantiner(env *env.Env) *Quarantiner {
 }
 
 // Load loads a given quarantiner.
-func (quarantiner *Quarantiner) Load() error {
+func (quarantiner *Quarantiner) Load(_ *os.Root) error {
 	if quarantiner.dir == "" {
 		return acter.ErrDisabled
 	}
+
+	root, err := os.OpenRoot(quarantiner.dir)
+	if err != nil {
+		return err
+	}
+
+	quarantiner.root = root
 
 	return nil
 }
@@ -42,12 +51,16 @@ func (quarantiner *Quarantiner) Act(result *state.Result) error {
 		return ErrQuarantineNoDir
 	}
 
+	if quarantiner.root == nil {
+		return fsys.ErrPathRoot
+	}
+
 	for path, meta := range result.Paths {
 		dst := fsys.QuarantinePath(quarantiner.dir, path)
 
 		meta.Status = filepath.Base(dst)
 
-		if err := fsys.Mv(path, dst, meta.Attr); err != nil {
+		if err := fsys.MvToRoot(quarantiner.root, path, dst, meta.Attr); err != nil {
 			// try next one.
 			result.AddErr(fmt.Errorf("%w, %v", ErrQuarantineMv, err))
 		}

@@ -21,7 +21,7 @@ func TestLoad(t *testing.T) {
 
 	path, err := os.Executable()
 	if err != nil {
-		t.Fatalf("exec path lookup error: %v", err)
+		t.Fatalf("exec path lookup err %v", err)
 	}
 
 	var (
@@ -36,24 +36,24 @@ func TestLoad(t *testing.T) {
 	)
 
 	if err := os.MkdirAll(dir, 0700); err != nil {
-		t.Fatalf("mkdir error: %v", err)
+		t.Fatalf("mkdir err %v", err)
 	}
 
 	for _, path := range files {
 		if _, err := os.Create(path); err != nil {
-			t.Fatalf("file create error: %v", err)
+			t.Fatalf("file create err %v", err)
 		}
 	}
 
-	if _, err = Load(&cmd.State{}); err != nil {
-		t.Errorf("load error: %v", err)
+	if _, got := Load(&cmd.State{}); got != nil {
+		t.Errorf("load err %v", got)
 	}
 }
 
 func TestSetOps(t *testing.T) {
 	env, err := Mock(t.Name(), t.TempDir())
 	if err != nil {
-		t.Fatalf("env mock error: %v", err)
+		t.Fatalf("env mock err %v", err)
 	}
 
 	layout := map[string]*bool{

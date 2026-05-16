@@ -40,7 +40,7 @@ func Prepare(hdrs []string, rows [][]string) ([]string, [][]string) {
 }
 
 // Print prints a table.
-func Print(title string, hdrs []string, rows [][]string) error {
+func Print(title string, hdrs []string, rows [][]string) {
 	tbl := simpletable.New()
 	tbl.SetStyle(simpletable.StyleUnicode)
 
@@ -68,6 +68,4 @@ func Print(title string, hdrs []string, rows [][]string) error {
 	}
 
 	tbl.Println()
-
-	return nil
 }

@@ -34,9 +34,10 @@ func TestAddSingle(t *testing.T) {
 }
 
 func TestAddCompound(t *testing.T) {
-	input := &Errs{}
-
-	want := compound
+	var (
+		input = &Errs{}
+		want  = compound
+	)
 
 	for _, err := range want {
 		input.Add(err)
@@ -50,13 +51,15 @@ func TestAddCompound(t *testing.T) {
 }
 
 func TestGet(t *testing.T) {
-	input := &Errs{
-		Vals: compound,
-	}
+	var (
+		input = &Errs{
+			Vals: compound,
+		}
 
-	result := input.Get()
+		got = input.Get()
+	)
 
-	if !slices.Equal(result, compound) {
-		t.Errorf("unexpected get result %v, want %v", result, compound)
+	if !slices.Equal(got, compound) {
+		t.Errorf("unexpected get result %v, want %v", got, compound)
 	}
 }

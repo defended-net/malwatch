@@ -7,74 +7,86 @@ import (
 	"testing"
 )
 
-func TestReMetaChars(t *testing.T) {
+func TestReMeta(t *testing.T) {
 	tests := []struct {
 		name  string
 		input string
 		want  bool
 	}{
 		{
-			name:  "valid",
+			name:  "ok",
 			input: "malwatch123",
 			want:  false,
 		},
+
 		{
 			name:  "semicolon",
 			input: "mal;watch",
 			want:  true,
 		},
+
 		{
 			name:  "amp",
 			input: "mal&watch",
 			want:  true,
 		},
+
 		{
 			name:  "pipe",
 			input: "mal|watch",
 			want:  true,
 		},
+
 		{
 			name:  "dollar",
 			input: "mal$watch",
 			want:  true,
 		},
+
 		{
 			name:  "backslash",
 			input: "mal\\watch",
 			want:  true,
 		},
+
 		{
 			name:  "bracket-open",
 			input: "mal(watch",
 			want:  true,
 		},
+
 		{
 			name:  "bracket-close",
 			input: "mal)watch",
 			want:  true,
 		},
+
 		{
 			name:  "smaller",
 			input: "mal<watch",
 			want:  true,
 		},
+
 		{
 			name:  "greater",
 			input: "mal>watch",
 			want:  true,
 		},
+
 		{
 			name:  "empty",
 			input: "",
 			want:  false,
 		},
+
 		{
 			name:  "tab",
 			input: "mal\twatch",
 			want:  false,
 		},
+
 		{
-			name:  "mixed",
+			name:  "compound",
 			input: "abc!@#%^*_+-=[]{}':\",./?",
 			want:  false,
 		},
@@ -82,9 +94,7 @@ func TestReMetaChars(t *testing.T) {
 
 	for _, test := range tests {
 		t.Run(test.name, func(t *testing.T) {
-			got := reMetaChars.MatchString(test.input)
-
-			if got != test.want {
+			if got := reMetaChars.MatchString(test.input); got != test.want {
 				t.Errorf("unexpected metachars result %v, want %v", got, test.want)
 			}
 		})

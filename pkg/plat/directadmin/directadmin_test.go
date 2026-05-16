@@ -21,7 +21,7 @@ import (
 func TestNew(t *testing.T) {
 	env, err := env.Mock(t.Name(), t.TempDir())
 	if err != nil {
-		t.Errorf("env mock error: %v", err)
+		t.Errorf("env mock err %v", err)
 	}
 
 	var (
@@ -52,21 +52,21 @@ func TestNew(t *testing.T) {
 	)
 
 	if !reflect.DeepEqual(got.cfg, want.cfg) {
-		t.Errorf("unexpected cfg %v, want %v", got, want)
+		t.Errorf("unexpected cfg result %v, want %v", got, want)
 	}
 
 	if !reflect.DeepEqual(got.endpoints, want.endpoints) {
-		t.Errorf("unexpected endpoints %v, want %v", got, want)
+		t.Errorf("unexpected endpoints result %v, want %v", got, want)
 	}
 }
 
 func TestLoad(t *testing.T) {
 	plat, err := Mock(t.Name(), t.TempDir())
 	if err != nil {
-		t.Errorf("mock error: %v", err)
+		t.Errorf("plat mock err %v", err)
 	}
 
-	serve := httptest.NewServer(http.HandlerFunc(func(wr http.ResponseWriter, _ *http.Request) {
+	svc := httptest.NewServer(http.HandlerFunc(func(wr http.ResponseWriter, _ *http.Request) {
 		data := Info{
 			Users: map[string]users{
 				"one": {
@@ -83,39 +83,41 @@ func TestLoad(t *testing.T) {
 		}
 
 		if err := json.NewEncoder(wr).Encode(data); err != nil {
-			t.Fatalf("json marshal error: %v", err)
+			t.Fatalf("json marshal err %v", err)
 		}
 	}))
 
-	plat.url = serve.URL
+	plat.url = svc.URL
 
-	if err = plat.Load(); err != nil {
-		t.Errorf("load error: %v", err)
+	if err = plat.Load(nil); err != nil {
+		t.Errorf("load err %v", err)
 	}
 }
 
 func TestLoadAuthed(t *testing.T) {
 	plat, err := Mock(t.Name(), t.TempDir())
 	if err != nil {
-		t.Errorf("mock error: %v", err)
+		t.Errorf("plat mock err %v", err)
 	}
 
-	if err = plat.Load(); err != nil && !strings.Contains(err.Error(), "unsupported protocol scheme") {
-		t.Errorf("load error: %v", err)
+	plat.url = "ftp://localhost"
+
+	if err = plat.Load(nil); err != nil && !strings.Contains(err.Error(), "unsupported protocol scheme") {
+		t.Errorf("load err %v", err)
 	}
 }
 
 func TestDocRoots(t *testing.T) {
 	tests := []struct {
-		name  string
-		serve *httptest.Server
-		want  []string
+		name string
+		svc  *httptest.Server
+		want []string
 	}{
 
 		{
 			name: "single-user-single-dom",
 
-			serve: httptest.NewServer(http.HandlerFunc(func(wr http.ResponseWriter, _ *http.Request) {
+			svc: httptest.NewServer(http.HandlerFunc(func(wr http.ResponseWriter, _ *http.Request) {
 				data := Info{
 					Users: map[string]users{
 						"one": {
@@ -130,7 +132,7 @@ func TestDocRoots(t *testing.T) {
 				}
 
 				if err := json.NewEncoder(wr).Encode(data); err != nil {
-					t.Fatalf("json marshal error: %v", err)
+					t.Fatalf("json marshal err %v", err)
 				}
 			})),
 
@@ -144,7 +146,7 @@ func TestDocRoots(t *testing.T) {
 		{
 			name: "single-user-single-sub",
 
-			serve: httptest.NewServer(http.HandlerFunc(func(wr http.ResponseWriter, _ *http.Request) {
+			svc: httptest.NewServer(http.HandlerFunc(func(wr http.ResponseWriter, _ *http.Request) {
 				data := Info{
 					Users: map[string]users{
 						"one": {
@@ -168,7 +170,7 @@ func TestDocRoots(t *testing.T) {
 				}
 
 				if err := json.NewEncoder(wr).Encode(data); err != nil {
-					t.Fatalf("json marshal error: %v", err)
+					t.Fatalf("json marshal err %v", err)
 				}
 			})),
 
@@ -184,7 +186,7 @@ func TestDocRoots(t *testing.T) {
 		{
 			name: "single-user-multi-dom",
 
-			serve: httptest.NewServer(http.HandlerFunc(func(wr http.ResponseWriter, _ *http.Request) {
+			svc: httptest.NewServer(http.HandlerFunc(func(wr http.ResponseWriter, _ *http.Request) {
 				data := Info{
 					Users: map[string]users{
 						"one": {
@@ -208,7 +210,7 @@ func TestDocRoots(t *testing.T) {
 				}
 
 				if err := json.NewEncoder(wr).Encode(data); err != nil {
-					t.Fatalf("json marshal error: %v", err)
+					t.Fatalf("json marshal err %v", err)
 				}
 			})),
 
@@ -226,7 +228,7 @@ func TestDocRoots(t *testing.T) {
 		{
 			name: "multi-user-multi-dom",
 
-			serve: httptest.NewServer(http.HandlerFunc(func(wr http.ResponseWriter, _ *http.Request) {
+			svc: httptest.NewServer(http.HandlerFunc(func(wr http.ResponseWriter, _ *http.Request) {
 				data := Info{
 					Users: map[string]users{
 						"one": {
@@ -282,7 +284,7 @@ func TestDocRoots(t *testing.T) {
 				}
 
 				if err := json.NewEncoder(wr).Encode(data); err != nil {
-					t.Fatalf("json marshal error: %v", err)
+					t.Fatalf("json marshal err %v", err)
 				}
 			})),
 
@@ -311,10 +313,10 @@ func TestDocRoots(t *testing.T) {
 		{
 			name: "empty",
 
-			serve: httptest.NewServer(http.HandlerFunc(func(wr http.ResponseWriter, _ *http.Request) {
+			svc: httptest.NewServer(http.HandlerFunc(func(wr http.ResponseWriter, _ *http.Request) {
 				data := Info{Users: map[string]users{}}
 				if err := json.NewEncoder(wr).Encode(data); err != nil {
-					t.Fatalf("json marshal error: %v", err)
+					t.Fatalf("json marshal err %v", err)
 				}
 			})),
 
@@ -324,21 +326,21 @@ func TestDocRoots(t *testing.T) {
 
 	for _, test := range tests {
 		t.Run(test.name, func(t *testing.T) {
-			plat := &Plat{
+			input := &Plat{
 				endpoints: &endpoints{
 					docroots: &endpoint{
-						url: test.serve.URL,
+						url: test.svc.URL,
 					},
 				},
 			}
 
-			paths, err := plat.DocRoots()
+			got, err := input.DocRoots()
 			if err != nil {
-				t.Errorf("docroots error: %v", err)
+				t.Errorf("docroots err %v", err)
 			}
 
-			if !slices.Equal(paths, test.want) {
-				t.Errorf("expected paths %v, got %v", test.want, paths)
+			if !slices.Equal(got, test.want) {
+				t.Errorf("unexpected docroots result %v, got %v", test.want, got)
 			}
 		})
 	}
@@ -375,5 +377,71 @@ func TestActers(t *testing.T) {
 
 	if !reflect.DeepEqual(got, plat.acters) {
 		t.Errorf("unexpected acters result %v, want %v", got, plat.acters)
+	}
+}
+
+func TestAuth(t *testing.T) {
+	plat, err := Mock(t.Name(), t.TempDir())
+	if err != nil {
+		t.Fatalf("plat mock err %v", err)
+	}
+
+	plat.url = "ftp://localhost"
+
+	if got := plat.Auth("user"); got != nil {
+		t.Errorf("auth err %v", got)
+	}
+}
+
+func TestAuthUserInvalid(t *testing.T) {
+	plat, err := Mock(t.Name(), t.TempDir())
+	if err != nil {
+		t.Fatalf("plat mock err %v", err)
+	}
+
+	plat.url = ""
+
+	if got := plat.Auth("../invalid"); got == nil {
+		t.Errorf("unexpected auth success")
+	}
+}
+
+func TestAuthBinInvalid(t *testing.T) {
+	plat, err := Mock(t.Name(), t.TempDir())
+	if err != nil {
+		t.Fatalf("plat mock err %v", err)
+	}
+
+	plat.url = ""
+	plat.bin = "/dev/null/not-exist"
+
+	if got := plat.Auth("user"); got == nil {
+		t.Errorf("unexpected auth success")
+	}
+}
+
+func TestAuthSchemeInvalid(t *testing.T) {
+	plat, err := Mock(t.Name(), t.TempDir())
+	if err != nil {
+		t.Fatalf("plat mock err %v", err)
+	}
+
+	plat.url = ""
+	plat.bin = "/bin/echo"
+
+	if got := plat.Auth("user"); got == nil {
+		t.Errorf("unexpected auth success")
+	}
+}
+
+func TestAddDocrootPathInvalid(t *testing.T) {
+	if got := addDocroot(map[string]struct{}{}, "el/path"); got {
+		t.Errorf("unexpected add docroot success")
+	}
+}
+
+func TestAddDocrootDotDots(t *testing.T) {
+	if got := addDocroot(map[string]struct{}{}, "/../etc/passwd"); got {
+		t.Errorf("unexpected add docroot success")
 	}
 }

@@ -56,6 +56,31 @@ func Update(env *env.Env) error {
 	return Refresh(env)
 }
 
+// delDotGit del .git through update.paths.Root after proving target is abs, has no traversal,
+// is under sig tmp dir and is local to install update.paths.Root.
+func (update *update) delDotGit(dst string) error {
+	dot := filepath.Join(dst, ".git")
+
+	if err := fsys.HasDotDots(dot); err != nil {
+		return err
+	}
+
+	if !fsys.IsRel(dot, update.paths.Tmp) {
+		return fmt.Errorf("%w, %v", fsys.ErrPathTraverse, dot)
+	}
+
+	rel, err := fsys.RootName(update.paths.Root, dot)
+	if err != nil {
+		return err
+	}
+
+	if err := update.paths.Root.RemoveAll(rel); err != nil {
+		return fmt.Errorf("%w, %v, %v", fsys.ErrFileDel, err, dot)
+	}
+
+	return nil
+}
+
 // clone clones repo.
 func (update *update) clone(repo *secret.Repo) error {
 	var (
@@ -71,31 +96,19 @@ func (update *update) clone(repo *secret.Repo) error {
 		return err
 	}
 
-	if !fsys.IsRel(dst, update.paths.Tmp) {
-		return fmt.Errorf("%w, %v", fsys.ErrPathTravers, dst)
-	}
-
 	switch {
 	case dst == "":
 		return ErrNoSigTmpDir
 
 	case !filepath.IsAbs(dst):
 		return fmt.Errorf("%w, %v", fsys.ErrPathNotAbs, dst)
+
+	case !fsys.IsRel(dst, update.paths.Tmp):
+		return fmt.Errorf("%w, %v", fsys.ErrPathTraverse, dst)
 	}
 
-	dot := filepath.Join(dst, ".git")
-
-	if err := fsys.HasDotDots(dot); err != nil {
+	if err := update.delDotGit(dst); err != nil {
 		return err
-	}
-
-	if !fsys.IsRel(dot, update.paths.Tmp) {
-		return fmt.Errorf("%w, %v", fsys.ErrPathTravers, dot)
-	}
-
-	// No err for not exist.
-	if err := os.RemoveAll(dot); err != nil {
-		return fmt.Errorf("%w, %v", fsys.ErrFileDel, dot)
 	}
 
 	tag, err := git.Clone(repo, dst)
@@ -110,6 +123,10 @@ func (update *update) clone(repo *secret.Repo) error {
 
 // install installs downloaded repo yr src files.
 func (update *update) install(_ *secret.Repo) error {
+	if update.paths.Root == nil {
+		return fsys.ErrPathRoot
+	}
+
 	attr := &fsys.Attr{
 		UID:  os.Getuid(),
 		GID:  os.Getgid(),
@@ -119,17 +136,21 @@ func (update *update) install(_ *secret.Repo) error {
 	for dir, files := range update.srcs {
 		parent := filepath.Join(update.paths.Src, dir)
 
-		// Validate parent against path traversal.
 		if err := fsys.HasDotDots(parent); err != nil {
 			return err
 		}
 
-		// Verify install dir is within the expected src dir.
+		// Verify install dir is within expected src dir.
 		if !fsys.IsRel(parent, update.paths.Src) {
-			return fmt.Errorf("%w, %v", fsys.ErrPathTravers, parent)
+			return fmt.Errorf("%w, %v", fsys.ErrPathTraverse, parent)
 		}
 
-		if err := os.MkdirAll(parent, 0700); err != nil {
+		parentName, err := fsys.RootName(update.paths.Root, parent)
+		if err != nil {
+			return err
+		}
+
+		if err := update.paths.Root.MkdirAll(parentName, 0700); err != nil {
 			return fmt.Errorf("%w, %v, %v", fsys.ErrDirCreate, err, parent)
 		}
 
@@ -145,13 +166,13 @@ func (update *update) install(_ *secret.Repo) error {
 
 			switch {
 			case !fsys.IsRel(src, update.paths.Tmp):
-				return fmt.Errorf("%w, %v", fsys.ErrPathTravers, src)
+				return fmt.Errorf("%w, %v", fsys.ErrPathTraverse, src)
 
 			case !fsys.IsRel(dst, update.paths.Src):
-				return fmt.Errorf("%w, %v", fsys.ErrPathTravers, dst)
+				return fmt.Errorf("%w, %v", fsys.ErrPathTraverse, dst)
 			}
 
-			if err := fsys.Mv(src, dst, attr); err != nil {
+			if err := fsys.MvAt(update.paths.Root, src, dst, attr); err != nil {
 				return fmt.Errorf("%w, %v, %v", fsys.ErrFileCopy, err, dst)
 			}
 		}
@@ -178,7 +199,7 @@ func (update *update) walk(path string) error {
 		)
 
 		if strings.Contains(parent, "..") {
-			slog.Info(fsys.ErrPathTravers.Error(), "path", src)
+			slog.Info(fsys.ErrPathTraverse.Error(), "path", src)
 			continue
 		}
 

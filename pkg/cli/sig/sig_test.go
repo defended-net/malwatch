@@ -12,21 +12,21 @@ import (
 func TestUpdate(t *testing.T) {
 	env, err := env.Mock(t.Name(), t.TempDir())
 	if err != nil {
-		t.Errorf("env mock error: %v", err)
+		t.Errorf("env mock err %v", err)
 	}
 
-	if err := Update(env, []string{}); err != nil {
-		t.Errorf("update error: %v", err)
+	if got := Update(env, []string{}); got != nil {
+		t.Errorf("update err %v", got)
 	}
 }
 
 func TestRefresh(t *testing.T) {
 	env, err := env.Mock(t.Name(), t.TempDir())
 	if err != nil {
-		t.Errorf("env mock error: %v", err)
+		t.Errorf("env mock err %v", err)
 	}
 
-	if err := Refresh(env, []string{""}); err != nil {
-		t.Errorf("refresh error: %v", err)
+	if got := Refresh(env, []string{""}); got != nil {
+		t.Errorf("refresh err %v", got)
 	}
 }

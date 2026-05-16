@@ -9,6 +9,7 @@ import (
 	"fmt"
 	"log/slog"
 	"net/http"
+	"os"
 	"path/filepath"
 	"time"
 
@@ -66,8 +67,8 @@ func New(env *env.Env) *Sender {
 }
 
 // Load loads alerter cfg files.
-func (sender *Sender) Load() error {
-	if err := sender.cfg.Load(); err != nil {
+func (sender *Sender) Load(root *os.Root) error {
+	if err := sender.cfg.Load(root); err != nil {
 		return err
 	}
 

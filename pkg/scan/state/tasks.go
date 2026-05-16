@@ -33,7 +33,9 @@ func (result *Result) Print() error {
 		})
 	}
 
-	return tbl.Print(result.Target, tbl.HdrFileReport, rows)
+	tbl.Print(result.Target, tbl.HdrFileReport, rows)
+
+	return nil
 }
 
 // Save saves given result's hits to given db.

@@ -4,13 +4,15 @@
 package alert
 
 import (
+	"os"
+
 	"github.com/defended-net/malwatch/pkg/plat"
 	"github.com/defended-net/malwatch/pkg/scan/state"
 )
 
-// Sender represents a sender.
+// Sender represents sender.
 type Sender interface {
-	Load() error
+	Load(*os.Root) error
 	Cfg() plat.Cfg
 	Alert(*state.Result) error
 }

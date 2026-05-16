@@ -11,10 +11,10 @@ import (
 )
 
 func TestLoad(t *testing.T) {
-	mock := Mock(acter.Mock(t.Name(), true))
+	input := Mock(acter.Mock(t.Name(), true))
 
-	if err := mock.Load(); err != nil {
-		t.Errorf("load error: %v", err)
+	if got := input.Load(nil); got != nil {
+		t.Errorf("mock load err %v", got)
 	}
 }
 

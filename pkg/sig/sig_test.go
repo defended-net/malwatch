@@ -37,11 +37,12 @@ func TestHasMatch(t *testing.T) {
 			want: false,
 		},
 
-		"multiple-match": {
+		"compound-match": {
 			matches: &yr.MatchRules{
 				{
 					Rule: "rule",
 				},
+
 				{
 					Rule: "eicar",
 				},
@@ -51,11 +52,12 @@ func TestHasMatch(t *testing.T) {
 			want: true,
 		},
 
-		"multiple-no-match": {
+		"compound-no-match": {
 			matches: &yr.MatchRules{
 				{
 					Rule: "rule",
 				},
+
 				{
 					Rule: "eicar",
 				},

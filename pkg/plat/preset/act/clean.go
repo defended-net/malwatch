@@ -33,6 +33,12 @@ type Cleaner struct {
 	expr    act.Clean
 	rules   string
 	scanner *yr.Scanner
+	root    *os.Root
+}
+
+type token struct {
+	cmd   rune
+	flags string
 }
 
 // NewCleaner returns cleaner for given env.
@@ -47,9 +53,17 @@ func NewCleaner(env *env.Env) *Cleaner {
 }
 
 // Load loads given cleaner.
-func (cleaner *Cleaner) Load() error {
+func (cleaner *Cleaner) Load(_ *os.Root) error {
 	if cleaner.dir == "" {
 		return acter.ErrDisabled
+	}
+
+	for rule, exprs := range cleaner.expr {
+		for _, expr := range exprs {
+			if err := isSafeExpr(expr); err != nil {
+				return fmt.Errorf("%w rule %q %v", ErrCleanExprNotSafe, rule, err)
+			}
+		}
 	}
 
 	rules, err := yr.LoadRules(cleaner.rules)
@@ -64,6 +78,13 @@ func (cleaner *Cleaner) Load() error {
 
 	cleaner.scanner.SetFlags(yr.ScanFlagsFastMode)
 
+	root, err := os.OpenRoot(cleaner.dir)
+	if err != nil {
+		return err
+	}
+
+	cleaner.root = root
+
 	return nil
 }
 
@@ -73,9 +94,13 @@ func (cleaner *Cleaner) Act(result *state.Result) error {
 		return ErrQuarantineNoDir
 	}
 
+	if cleaner.root == nil {
+		return fsys.ErrPathRoot
+	}
+
 	for path, meta := range result.Paths {
 		if err := cleaner.clean(path, meta); err != nil {
-			slog.Error(err.Error())
+			result.AddErr(fmt.Errorf("%w, %v, %v", ErrCleanFail, err, path))
 		}
 	}
 
@@ -84,84 +109,140 @@ func (cleaner *Cleaner) Act(result *state.Result) error {
 
 // clean cleans a given path with given hit meta.
 func (cleaner *Cleaner) clean(path string, meta *hit.Meta) error {
-	if !filepath.IsAbs(meta.Status) {
-		meta.Status = fsys.QuarantinePath(cleaner.dir, path)
+	fd, _, err := fsys.Open(path)
+	if err != nil {
+		return fmt.Errorf("%w, %v", err, path)
+	}
+	defer fsys.CloseFd(fd)
 
-		if err := fsys.Mv(path, meta.Status, meta.Attr); err != nil {
-			return err
+	meta.Status = fsys.QuarantinePath(cleaner.dir, path)
+
+	if err := fsys.Mv(path, meta.Status, meta.Attr); err != nil {
+		return fmt.Errorf("%w, %v", ErrMv, err)
+	}
+
+	cleaned, err := cleaner.transform(meta)
+	if err != nil {
+		return err
+	}
+
+	if err := fsys.Mv(cleaned, path, meta.Attr); err != nil {
+		if err := fsys.Unlink(cleaned, false); err != nil {
+			slog.Error(ErrDel.Error(), "msg", err, "path", cleaned)
 		}
+
+		return fmt.Errorf("%w, %v", ErrMv, err)
 	}
 
-	src, err := os.Open(meta.Status)
-	if err != nil {
-		return fmt.Errorf("%w, %v, %v", fsys.ErrFileOpen, err, meta.Status)
-	}
-	defer src.Close()
+	slog.Info("clean", "path", cleaned)
 
-	dst, err := os.OpenFile(meta.Status+"-clean", os.O_CREATE|os.O_APPEND|os.O_WRONLY, 0600)
+	return nil
+}
+
+// transform transforms given meta.
+func (cleaner *Cleaner) transform(meta *hit.Meta) (string, error) {
+	var (
+		clean = filepath.Clean(meta.Status + "-clean")
+		ok    bool
+	)
+
+	srcName, err := fsys.RootName(cleaner.root, meta.Status)
 	if err != nil {
-		return fmt.Errorf("%w, %v, %v", fsys.ErrFileOpen, err, meta.Status+"-clean")
+		return "", err
 	}
-	defer dst.Close()
+
+	cleanName, err := fsys.RootName(cleaner.root, clean)
+	if err != nil {
+		return "", err
+	}
+
+	srcF, err := cleaner.root.OpenFile(srcName, os.O_RDONLY, 0)
+	if err != nil {
+		return "", err
+	}
+	defer fsys.Close(srcF)
+
+	dstF, err := cleaner.root.OpenFile(cleanName, os.O_RDWR|os.O_CREATE|os.O_TRUNC, 0o600)
+	if err != nil {
+		return "", err
+	}
+	defer fsys.Close(dstF)
+
+	defer func() {
+		if !ok {
+			if err := fsys.Unlink(clean, false); err != nil {
+				slog.Error(fsys.ErrFileDel.Error(), "msg", err, "path", clean)
+			}
+		}
+	}()
 
 	for _, rule := range meta.Rules {
-		exprs, ok := cleaner.expr[rule]
-		if !ok {
-			return fmt.Errorf("%w, %v, %v", ErrCleanNoExpr, rule, meta.Status)
+		exprs, has := cleaner.expr[rule]
+		if !has {
+			return "", fmt.Errorf("%w, %v, %v", ErrCleanExprMissing, rule, meta.Status)
 		}
 
 		slog.Info("attempting clean", "rule", rule, "path", meta.Status)
 
-		if err := cleaner.transform(src, dst, rule, exprs); err != nil {
-			return err
+		if err := cleaner.apply(srcF, dstF, rule, exprs); err != nil {
+			return "", err
 		}
 	}
 
-	slog.Info("clean", "path", dst.Name())
+	ok = true
 
-	return fsys.Mv(dst.Name(), path, meta.Attr)
+	return clean, nil
 }
 
-// transform executes given sed expr for given src and dst files.
-func (cleaner *Cleaner) transform(src *os.File, dst *os.File, rule string, exprs []string) error {
+// apply execs given exprs against src to dst.
+func (cleaner *Cleaner) apply(src *os.File, dst *os.File, rule string, exprs []string) error {
 	var (
+		engines = make([]*sed.Engine, len(exprs))
 		matches = &yr.MatchRules{}
 		buff    = make([]byte, cleaner.blkSz)
-		result  string
 	)
+
+	for idx, expr := range exprs {
+		if err := isSafeExpr(expr); err != nil {
+			return err
+		}
+
+		engine, err := sed.New(strings.NewReader(expr))
+		if err != nil {
+			return fmt.Errorf("%w, %v,", ErrCleanExprCompile, err)
+		}
+
+		engines[idx] = engine
+	}
 
 	for {
 		offset, err := src.Read(buff)
 
 		if offset > 0 {
-			for _, expr := range exprs {
-				engine, err := sed.New(strings.NewReader(expr))
+			data := string(buff[:offset])
+
+			for _, engine := range engines {
+				data, err = engine.RunString(data)
 				if err != nil {
-					return err
-				}
-
-				result, err = engine.RunString(string(buff[:offset]))
-				if err != nil {
-					return err
-				}
-
-				cleaner.scanner.SetCallback(matches)
-
-				if err := cleaner.scanner.ScanMem([]byte(result)); err != nil {
-					return err
-				}
-
-				if sig.HasMatch(matches, rule) {
-					return fmt.Errorf("%w, %v", ErrCleanFailed, src.Name())
+					return fmt.Errorf("%w, %v,", ErrCleanExprDo, err)
 				}
 			}
 
-			if _, err := dst.WriteString(result); err != nil {
+			*matches = yr.MatchRules{}
+
+			cleaner.scanner.SetCallback(matches)
+
+			if err = cleaner.scanner.ScanMem([]byte(data)); err != nil {
 				return err
 			}
 
-			buff = buff[:cleaner.blkSz]
-			matches = nil
+			if sig.HasMatch(matches, rule) {
+				return fmt.Errorf("%w, %v", ErrCleanFail, src.Name())
+			}
+
+			if _, err = dst.WriteString(data); err != nil {
+				return fmt.Errorf("%w, %v", ErrCleanFail, dst.Name())
+			}
 		}
 
 		if err != nil {
@@ -176,7 +257,7 @@ func (cleaner *Cleaner) transform(src *os.File, dst *os.File, rule string, exprs
 	return nil
 }
 
-// Verb returns a given cleaner verb.
+// Verb returns given cleaner verb.
 func (cleaner *Cleaner) Verb() string {
 	return cleaner.verb
 }

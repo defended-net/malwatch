@@ -4,18 +4,20 @@
 package plat
 
 import (
+	"os"
+
 	"github.com/defended-net/malwatch/pkg/plat/acter"
 )
 
 // Plat represents the platform.
 type Plat interface {
-	Load() error
+	Load(*os.Root) error
 	Cfg() Cfg
 	Acters() []acter.Acter
 }
 
 // Cfg represents a cfg.
 type Cfg interface {
-	Load() error
+	Load(*os.Root) error
 	Path() string
 }

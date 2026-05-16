@@ -11,8 +11,9 @@ import (
 	"strings"
 	"testing"
 
-	"github.com/rwtodd/Go.Sed/sed"
 	"golang.org/x/sys/unix"
+
+	"github.com/rwtodd/Go.Sed/sed"
 
 	"github.com/defended-net/malwatch/pkg/boot/env"
 	"github.com/defended-net/malwatch/pkg/boot/env/cfg/act"
@@ -40,7 +41,7 @@ var (
 func TestNewCleaner(t *testing.T) {
 	env, err := env.Mock(t.Name(), t.TempDir())
 	if err != nil {
-		t.Fatalf("env mock error: %s", err)
+		t.Fatalf("env mock err %s", err)
 	}
 
 	var (
@@ -56,85 +57,95 @@ func TestNewCleaner(t *testing.T) {
 	)
 
 	if !reflect.DeepEqual(got, want) {
-		t.Errorf("unexpected cleaner result %v, want %v", got, want)
+		t.Errorf("unexpected create cleaner result %v, want %v", got, want)
 	}
 }
 
 func TestCleanLoad(t *testing.T) {
 	env, err := env.Mock(t.Name(), t.TempDir())
 	if err != nil {
-		t.Fatalf("env mock error: %s", err)
+		t.Fatalf("env mock err %s", err)
 	}
 
 	if err := sig.Mock(env, true); err != nil {
-		t.Fatalf("sig mock error: %s", err)
+		t.Fatalf("sig mock err %s", err)
 	}
 
-	acter := &Cleaner{
+	input := &Cleaner{
 		dir:   t.TempDir(),
 		rules: env.Paths.Sigs.Yrc,
 	}
 
-	if err := acter.Load(); err != nil {
-		t.Errorf("cleaner load error: %v", err)
+	if err := input.Load(nil); err != nil {
+		t.Errorf("acter load err %v", err)
 	}
 }
 
 func TestCleanDisabled(t *testing.T) {
-	input := &Cleaner{}
+	var (
+		input = &Cleaner{}
+		want  = acter.ErrDisabled
+	)
 
-	if got := input.Load(); !errors.Is(got, acter.ErrDisabled) {
-		t.Errorf("unexpected cleaner load error %v, want %v", got, acter.ErrDisabled)
+	if got := input.Load(nil); !errors.Is(got, want) {
+		t.Errorf("unexpected acter load error %v, want %v", got, want)
 	}
 }
 
 func TestCleanVerb(t *testing.T) {
-	acter := &Cleaner{
-		verb: VerbClean,
-	}
+	var (
+		input = &Cleaner{
+			verb: VerbClean,
+		}
 
-	if got := acter.Verb(); got != VerbClean {
-		t.Errorf("unexpected verb result %v, want %v", got, VerbClean)
+		want = VerbClean
+	)
+
+	if got := input.Verb(); got != want {
+		t.Errorf("unexpected verb result %v, want %v", got, want)
 	}
 }
 
-func TestCleanInject(t *testing.T) {
+func TestCleanInj(t *testing.T) {
 	env, err := env.Mock(t.Name(), t.TempDir())
 	if err != nil {
-		t.Fatalf("env mock error: %s", err)
+		t.Fatalf("env mock err %s", err)
 	}
 
 	if err := sig.Mock(env, true); err != nil {
-		t.Fatalf("sig mock error: %v", err)
+		t.Fatalf("sig mock err %v", err)
 	}
 
-	acter := NewCleaner(env)
+	var (
+		acter = NewCleaner(env)
+		path  = filepath.Join(t.TempDir(), t.Name())
 
-	if err := acter.Load(); err != nil {
-		t.Fatalf("cleaner load error: %s", err)
+		malware = []byte(`<?php echo "hello world";
+eval(gzinflate(base64_decode('test')));
+?>`)
+
+		stat = &unix.Stat_t{}
+	)
+
+	if err := os.WriteFile(path, []byte(malware), 0600); err != nil {
+		t.Fatalf("file write err %v", err)
+	}
+
+	if err := acter.Load(nil); err != nil {
+		t.Fatalf("acter load err %s", err)
 	}
 
 	acter.expr = act.Clean{
 		"gz": reGz,
 	}
 
-	malware := []byte(`<?php echo "hello world";
-eval(gzinflate(base64_decode('test')));
-?>`)
-
-	path := filepath.Join(t.TempDir(), t.Name())
-
-	if err := os.WriteFile(path, []byte(malware), 0600); err != nil {
-		t.Fatalf("file write error: %v", err)
-	}
-
-	stat := &unix.Stat_t{}
-
 	if err := unix.Stat(path, stat); err != nil {
-		t.Fatalf("stat error: %v", err)
+		t.Fatalf("stat err %v", err)
 	}
 
-	input := state.NewResult("",
+	input := state.NewResult(
+		"",
+
 		state.Paths{
 			path: hit.NewMeta(
 				fsys.NewAttr(stat),
@@ -143,43 +154,40 @@ eval(gzinflate(base64_decode('test')));
 
 				"clean",
 			),
-		})
+		},
+	)
 
-	if err := acter.Act(input); err != nil {
-		t.Errorf("clean act error: %v", err)
+	if got := acter.Act(input); got != nil {
+		t.Errorf("act err %v", got)
 	}
 }
 
-func TestCleanInjectMultiLine(t *testing.T) {
+func TestCleanInjMultiLine(t *testing.T) {
 	env, err := env.Mock(t.Name(), t.TempDir())
 	if err != nil {
-		t.Fatalf("env mock error: %s", err)
+		t.Fatalf("env mock err %s", err)
 	}
 
 	if err := sig.Mock(env, true); err != nil {
-		t.Fatalf("sig mock error: %s", err)
-	}
-
-	acter := &Cleaner{
-		dir:   t.TempDir(),
-		rules: env.Paths.Sigs.Yrc,
-
-		blkSz: 32768,
-
-		expr: map[string][]string{
-			"php_base64_inject": {
-				`s/<?.*eval\(base64_decode\(.*?>//`,
-				`s/<?php.*eval\(base64_decode\(.*?>//`,
-				`s/eval\(base64_decode\([^;]*;//`,
-			},
-		},
-	}
-
-	if err := acter.Load(); err != nil {
-		t.Fatalf("cleaner load error: %v", err)
+		t.Fatalf("sig mock err %s", err)
 	}
 
 	var (
+		input = &Cleaner{
+			dir:   t.TempDir(),
+			rules: env.Paths.Sigs.Yrc,
+
+			blkSz: 32768,
+
+			expr: map[string][]string{
+				"php_base64_inject": {
+					`s/<?.*eval\(base64_decode\(.*?>//`,
+					`s/<?php.*eval\(base64_decode\(.*?>//`,
+					`s/eval\(base64_decode\([^;]*;//`,
+				},
+			},
+		}
+
 		path = filepath.Join(t.TempDir(), t.Name())
 
 		sample = `<?php echo "hello world";
@@ -189,11 +197,15 @@ eval(base64_decode("ware"));
 ?>`
 	)
 
-	if err := os.WriteFile(path, []byte(sample), 0600); err != nil {
-		t.Fatalf("hit file write error: %s", err)
+	if err := input.Load(nil); err != nil {
+		t.Fatalf("cleaner load err %v", err)
 	}
 
-	if err := acter.clean(path, &hit.Meta{
+	if err := os.WriteFile(path, []byte(sample), 0600); err != nil {
+		t.Fatalf("file write err %s", err)
+	}
+
+	if got := input.clean(path, &hit.Meta{
 		Rules: []string{"php_base64_inject"},
 
 		Attr: &fsys.Attr{
@@ -201,8 +213,8 @@ eval(base64_decode("ware"));
 			GID:  os.Getgid(),
 			Mode: 0600,
 		},
-	}); err != nil {
-		t.Errorf("clean error: %s", err)
+	}); got != nil {
+		t.Errorf("clean err %s", got)
 	}
 }
 
@@ -233,12 +245,12 @@ eval(base64_decode("test"));
 			for _, re := range reB64 {
 				sed, err := sed.New(strings.NewReader(re))
 				if err != nil {
-					t.Fatalf("sed init error: %v", err)
+					t.Fatalf("sed init err %v", err)
 				}
 
 				test.input, err = sed.RunString(test.input)
 				if err != nil {
-					t.Fatalf("sed run error: %v", err)
+					t.Fatalf("sed run err %v", err)
 				}
 			}
 
@@ -275,12 +287,12 @@ echo "foo";
 			for _, re := range reB64 {
 				sed, err := sed.New(strings.NewReader(re))
 				if err != nil {
-					t.Fatalf("sed init error: %v", err)
+					t.Fatalf("sed init err %v", err)
 				}
 
 				test.input, err = sed.RunString(test.input)
 				if err != nil {
-					t.Fatalf("sed run error: %v", err)
+					t.Fatalf("sed run err %v", err)
 				}
 			}
 
@@ -313,12 +325,12 @@ eval(gzinflate(base64_decode('test')));
 			for _, re := range reGz {
 				sed, err := sed.New(strings.NewReader(re))
 				if err != nil {
-					t.Fatalf("sed init error: %v", err)
+					t.Fatalf("sed init err %v", err)
 				}
 
 				test.input, err = sed.RunString(test.input)
 				if err != nil {
-					t.Fatalf("sed run error: %v", err)
+					t.Fatalf("sed run err %v", err)
 				}
 			}
 
@@ -357,12 +369,12 @@ echo "foo";
 			for _, re := range append(reB64, reGz...) {
 				sed, err := sed.New(strings.NewReader(re))
 				if err != nil {
-					t.Fatalf("sed init error: %v", err)
+					t.Fatalf("create sed err %v", err)
 				}
 
 				result, err = sed.RunString(string(test.input))
 				if err != nil {
-					t.Fatalf("sed run error: %v", err)
+					t.Fatalf("sed run err %v", err)
 				}
 			}
 
@@ -399,12 +411,12 @@ echo "foo";
 			for _, re := range append(reB64, reGz...) {
 				sed, err := sed.New(strings.NewReader(re))
 				if err != nil {
-					t.Fatalf("sed init error: %v", err)
+					t.Fatalf("sed init err %v", err)
 				}
 
 				test.input, err = sed.RunString(string(test.input))
 				if err != nil {
-					t.Fatalf("sed run error: %v", err)
+					t.Fatalf("sed run err %v", err)
 				}
 			}
 
@@ -421,7 +433,7 @@ func TestCleanErrs(t *testing.T) {
 		want  = ErrQuarantineNoDir
 	)
 
-	if err := input.Act(nil); !errors.Is(err, want) {
-		t.Errorf("unexpected clean error %v, want %v", input, want)
+	if got := input.Act(nil); !errors.Is(got, want) {
+		t.Errorf("unexpected clean err %v, want %v", got, want)
 	}
 }

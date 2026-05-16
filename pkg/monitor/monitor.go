@@ -175,7 +175,11 @@ func update(notify *fan.Notify) (string, error) {
 	if err != nil {
 		return "", err
 	}
-	defer meta.Close()
+
+	defer func(meta *fan.EventMeta) {
+		// lint
+		_ = meta.Close()
+	}(meta)
 
 	if meta == nil {
 		return "", nil

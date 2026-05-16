@@ -7,6 +7,7 @@ import (
 	"errors"
 	"fmt"
 	"io/fs"
+	"os"
 
 	"github.com/defended-net/malwatch/pkg/boot/env"
 	"github.com/defended-net/malwatch/pkg/fsys"
@@ -14,6 +15,7 @@ import (
 	"github.com/defended-net/malwatch/pkg/plat/alert"
 	"github.com/defended-net/malwatch/pkg/plat/preset/alert/json"
 	"github.com/defended-net/malwatch/pkg/plat/preset/alert/pagerduty"
+	"github.com/defended-net/malwatch/pkg/plat/preset/alert/slack"
 	"github.com/defended-net/malwatch/pkg/plat/preset/alert/smtp"
 	"github.com/defended-net/malwatch/pkg/scan/state"
 )
@@ -31,6 +33,7 @@ func NewAlerter(env *env.Env) *Alerter {
 
 		senders: []alert.Sender{
 			json.New(env),
+			slack.New(env),
 			pagerduty.New(env),
 			smtp.New(env),
 		},
@@ -38,18 +41,24 @@ func NewAlerter(env *env.Env) *Alerter {
 }
 
 // Load loads given alerter.
-func (alerter *Alerter) Load() error {
+func (alerter *Alerter) Load(root *os.Root) error {
+	if root == nil {
+		return fsys.ErrPathRoot
+	}
+
 	enabled := []alert.Sender{}
 
 	for _, sender := range alerter.senders {
-		err := fsys.InstallTOML(sender.Cfg().Path(), sender.Cfg())
+		path := sender.Cfg().Path()
+
+		err := fsys.InstallTOML(root, path, sender.Cfg())
 
 		switch {
 		case err == nil:
 			continue
 
 		case errors.Is(err, fs.ErrExist):
-			err := sender.Load()
+			err := sender.Load(root)
 
 			switch {
 			case errors.Is(err, acter.ErrDisabled):
@@ -62,7 +71,7 @@ func (alerter *Alerter) Load() error {
 			enabled = append(enabled, sender)
 
 		default:
-			return fmt.Errorf("%w, %v, %v", ErrCfgLoad, err, sender.Cfg().Path())
+			return fmt.Errorf("%w, %v, %v", ErrCfgLoad, err, path)
 		}
 	}
 

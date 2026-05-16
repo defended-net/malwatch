@@ -4,6 +4,8 @@
 package preset
 
 import (
+	"os"
+
 	"github.com/defended-net/malwatch/pkg/boot/env"
 	"github.com/defended-net/malwatch/pkg/plat"
 	"github.com/defended-net/malwatch/pkg/plat/acter"
@@ -32,8 +34,8 @@ func New(env *env.Env) *Plat {
 }
 
 // Load reads given plat cfg files.
-func (plat *Plat) Load() error {
-	acters, err := acter.Load(plat.acters)
+func (plat *Plat) Load(root *os.Root) error {
+	acters, err := acter.Load(root, plat.acters)
 	if err != nil {
 		return err
 	}
@@ -59,6 +61,6 @@ func (cfg *Cfg) Path() string {
 }
 
 // Load loads the cfg.
-func (cfg *Cfg) Load() error {
+func (cfg *Cfg) Load(_ *os.Root) error {
 	return nil
 }

@@ -4,6 +4,8 @@
 package acter
 
 import (
+	"os"
+
 	"github.com/defended-net/malwatch/pkg/scan/state"
 )
 
@@ -27,7 +29,7 @@ func (act *mock) Verb() string {
 }
 
 // Load loads the quarantiner.
-func (act *mock) Load() error {
+func (act *mock) Load(_ *os.Root) error {
 	if !act.isEnabled {
 		return ErrDisabled
 	}

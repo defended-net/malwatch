@@ -4,6 +4,8 @@
 package directadmin
 
 import (
+	"os"
+
 	"github.com/defended-net/malwatch/pkg/fsys"
 )
 
@@ -15,8 +17,8 @@ type Cfg struct {
 }
 
 // Load loads the cfg.
-func (cfg *Cfg) Load() error {
-	if err := fsys.ReadTOML(cfg.Path(), cfg); err != nil {
+func (cfg *Cfg) Load(root *os.Root) error {
+	if err := fsys.ReadTOML(root, cfg.Path(), cfg); err != nil {
 		return err
 	}
 

@@ -15,8 +15,8 @@ func TestMockLoad(t *testing.T) {
 		isEnabled: true,
 	}
 
-	if got := input.Load(); got != nil {
-		t.Errorf("unexpected verb result %v, want %v", got, nil)
+	if got := input.Load(nil); got != nil {
+		t.Errorf("unexpected load result %v, want %v", got, nil)
 	}
 }
 
@@ -36,19 +36,18 @@ func TestVerb(t *testing.T) {
 	}
 }
 
-func TestActed(t *testing.T) {
+func TestAct(t *testing.T) {
 	input := &mock{}
 
 	if err := input.Act(&state.Result{}); err != nil || input.Acted != true {
-		t.Errorf("unexpected acted result %v %v, want %v", err, input.Acted, true)
+		t.Errorf("unexpected act result %v %v, want %v", err, input.Acted, true)
 	}
 }
 
 func TestMock(t *testing.T) {
 	var (
 		input = t.Name()
-
-		got = Mock(input, true)
+		got   = Mock(input, true)
 
 		want = &mock{
 			verb:      input,

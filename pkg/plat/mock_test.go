@@ -4,24 +4,45 @@
 package plat
 
 import (
+	"os"
 	"testing"
 )
 
-func TestMockCfgLoad(t *testing.T) {
-	mock := &mock{}
+func TestMockLoad(t *testing.T) {
+	input := &mock{}
 
-	if err := mock.Cfg().Load(); err != nil {
-		t.Errorf("mock cfg load error: %v", err)
+	if got := input.Load(nil); got != nil {
+		t.Errorf("mock load err %v", got)
+	}
+}
+
+func TestMockCfgLoad(t *testing.T) {
+	var (
+		input     = &mock{}
+		root, err = os.OpenRoot(t.TempDir())
+	)
+
+	if err != nil {
+		t.Fatalf("open root err %v", err)
+	}
+
+	defer func() {
+		// lint
+		_ = root.Close()
+	}()
+
+	if got := input.Cfg().Load(root); got != nil {
+		t.Errorf("mock cfg load err %v", got)
 	}
 }
 
 func TestMockCfgPath(t *testing.T) {
 	var (
-		mock = &mock{}
-		want = ""
+		input = &mock{}
+		want  = ""
 	)
 
-	if result := mock.Cfg().Path(); result != want {
-		t.Errorf("unexpected cfg path result %v, want %v", result, want)
+	if got := input.Cfg().Path(); got != want {
+		t.Errorf("unexpected cfg path result %v, want %v", got, want)
 	}
 }

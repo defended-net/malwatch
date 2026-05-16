@@ -4,6 +4,8 @@
 package cpanel
 
 import (
+	"os"
+
 	"github.com/defended-net/malwatch/pkg/fsys"
 )
 
@@ -19,6 +21,6 @@ func (cfg *Cfg) Path() string {
 }
 
 // Load loads the cfg.
-func (cfg *Cfg) Load() error {
-	return fsys.ReadTOML(cfg.Path(), cfg)
+func (cfg *Cfg) Load(root *os.Root) error {
+	return fsys.ReadTOML(root, cfg.Path(), cfg)
 }

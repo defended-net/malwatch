@@ -4,6 +4,8 @@
 package plat
 
 import (
+	"os"
+
 	"github.com/defended-net/malwatch/pkg/plat/acter"
 )
 
@@ -21,7 +23,7 @@ func Mock(acts ...acter.Acter) mock {
 }
 
 // Load loads a given mocked plat.
-func (plat mock) Load() error {
+func (plat mock) Load(_ *os.Root) error {
 	return nil
 }
 
@@ -36,7 +38,7 @@ func (plat mock) Cfg() Cfg {
 }
 
 // Load loads a given mocked cfg.
-func (cfg cfg) Load() error {
+func (cfg cfg) Load(_ *os.Root) error {
 	return nil
 }
 

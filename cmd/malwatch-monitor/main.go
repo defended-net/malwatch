@@ -4,6 +4,7 @@
 package main
 
 import (
+	"fmt"
 	"log/slog"
 	"runtime/debug"
 
@@ -19,6 +20,7 @@ func main() {
 
 	defer func() {
 		if ok := recover(); ok != nil {
+			err = fmt.Errorf("panic: %v", ok)
 			slog.Error("panic", "stack", string(debug.Stack()))
 		}
 

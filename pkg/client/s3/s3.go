@@ -6,8 +6,11 @@ package s3
 import (
 	"context"
 	"fmt"
+	"io"
 	"log/slog"
 	"os"
+
+	"golang.org/x/sys/unix"
 
 	"github.com/minio/minio-go/v7"
 	"github.com/minio/minio-go/v7/pkg/credentials"
@@ -25,7 +28,7 @@ type Transport struct {
 	bucket string
 }
 
-// New returns a new transport.
+// New returns new transport.
 func New(secrets *secret.S3) (*Transport, error) {
 	opts := &minio.Options{
 		Creds:  credentials.NewStaticV4(secrets.Key, secrets.Secret, ""),
@@ -57,61 +60,76 @@ func New(secrets *secret.S3) (*Transport, error) {
 	}, nil
 }
 
-// Dl downloads a file. Permissions and ownership are adjusted based on given attributes.
+// Dl downloads a file. Perms and owner from given attr.
 func (transport *Transport) Dl(path string, attr *fsys.Attr) error {
-	slog.Info("downloading", "path", path)
+	if err := fsys.HasDotDots(path); err != nil {
+		return err
+	}
 
-	file, err := os.OpenFile(path, os.O_RDWR|os.O_CREATE|os.O_EXCL, attr.Mode)
+	fd, _, err := fsys.OpenFile(path, unix.O_WRONLY|unix.O_CREAT|unix.O_TRUNC)
 	if err != nil {
-		return fmt.Errorf("%w, %v, %v", fsys.ErrFileOpen, err, path)
-	}
-	defer file.Close()
-
-	if err := transport.client.FGetObject(
-		context.Background(),
-		transport.bucket,
-		path,
-		path,
-		minio.GetObjectOptions{},
-	); err != nil {
-		return fmt.Errorf("%w, %v, %v", ErrObjGet, err, path)
+		return err
 	}
 
-	slog.Info("download complete", "path", file.Name())
+	file := os.NewFile(uintptr(fd), path)
+	defer fsys.Close(file)
 
-	if err := os.Chmod(file.Name(), attr.Mode); err != nil {
+	if err := unix.Fchmod(fd, 0600); err != nil {
 		return fmt.Errorf("%w, %v, %v", fsys.ErrChmod, err, path)
 	}
 
-	if err := os.Chown(file.Name(), attr.UID, attr.GID); err != nil {
+	obj, err := transport.client.GetObject(
+		context.Background(),
+		transport.bucket,
+		path,
+		minio.GetObjectOptions{},
+	)
+	if err != nil {
+		return fmt.Errorf("%w, %v, %v", ErrObjGet, err, path)
+	}
+
+	if _, err := io.Copy(file, obj); err != nil {
+		return fmt.Errorf("%w, %v, %v", ErrObjGet, err, path)
+	}
+
+	if err := unix.Fchmod(fd, uint32(attr.Mode)); err != nil {
+		return fmt.Errorf("%w, %v, %v", fsys.ErrChmod, err, path)
+	}
+
+	if err := unix.Fchown(fd, attr.UID, attr.GID); err != nil {
 		return fmt.Errorf("%w, %v, %v", fsys.ErrChown, err, path)
 	}
+
+	slog.Info("download complete", "path", path)
 
 	return nil
 }
 
-// Ul uploads a file.
-func (transport *Transport) Ul(path string) error {
-	slog.Info("uploading", "path", path)
-
-	file, err := os.Open(path)
-	if err != nil {
-		return fmt.Errorf("%w, %v, %v", fsys.ErrFileOpen, err, path)
+// Ul uploads file from given path.
+func (transport *Transport) Ul(key string, file *os.File) error {
+	if err := fsys.HasDotDots(key); err != nil {
+		return fmt.Errorf("%w, %v", fsys.ErrPathTraverse, key)
 	}
-	defer file.Close()
 
-	if _, err := transport.client.FPutObject(
+	info, err := file.Stat()
+	if err != nil {
+		return fmt.Errorf("%w, %v, %v", fsys.ErrStat, err, key)
+	}
+
+	if _, err = transport.client.PutObject(
 		context.Background(),
 		transport.bucket,
-		path,
-		path,
+		key,
+		file,
+		info.Size(),
 		minio.PutObjectOptions{
 			ContentType: "application/octet-stream",
-		}); err != nil {
-		return err
+		},
+	); err != nil {
+		return fmt.Errorf("%w, %v, %v", ErrObjPut, err, key)
 	}
 
-	slog.Info("upload complete", "path", file.Name())
+	slog.Info("upload complete", "path", key)
 
 	return nil
 }

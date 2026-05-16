@@ -19,12 +19,13 @@ jobs:
       - name: checkout
         uses: actions/checkout@v4
 
-      - name: set up go
+      - name: setup go
         uses: actions/setup-go@v5
         with:
           check-latest: true
 
-      - name: run golangci-lint
-        uses: golangci/golangci-lint-action@v6
+      - name: golangci-lint
+        uses: golangci/golangci-lint-action@v7
         with:
-          args: --timeout=5m --exclude-dirs='(third_party)'
+          version: latest
+          args: --timeout=5m

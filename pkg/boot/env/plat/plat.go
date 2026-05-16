@@ -26,7 +26,7 @@ func Load(env *env.Env) error {
 	}
 
 	for _, plat := range plats {
-		err := fsys.InstallTOML(plat.Cfg().Path(), plat.Cfg())
+		err := fsys.InstallTOML(env.Paths.Install.Root, plat.Cfg().Path(), plat.Cfg())
 		switch {
 		case err == nil:
 			continue
@@ -39,5 +39,5 @@ func Load(env *env.Env) error {
 		}
 	}
 
-	return env.Plat.Load()
+	return env.Plat.Load(env.Paths.Install.Root)
 }

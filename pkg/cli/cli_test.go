@@ -9,8 +9,6 @@ import (
 	"fmt"
 	"os"
 	"testing"
-
-	"github.com/defended-net/malwatch/pkg/boot/env"
 )
 
 type input struct {
@@ -152,6 +150,35 @@ func TestRoute(t *testing.T) {
 				help: mock.err,
 			},
 		},
+
+		"nested-extra": {
+			input: []string{
+				"malwatch",
+				"mock-a",
+				"mock-b",
+				"extra",
+			},
+
+			sub: Sub{
+				"mock-a": Mock(
+					1,
+
+					Sub{
+						"mock-b": {
+							Help: mock.err,
+							Min:  0,
+							Fn:   mock.fn,
+						},
+					},
+				),
+			},
+
+			want: &want{
+				err:  nil,
+				fn:   mock.fn,
+				help: mock.err,
+			},
+		},
 	}
 
 	for name, test := range tests {
@@ -159,21 +186,21 @@ func TestRoute(t *testing.T) {
 			os.Args = test.input
 			flag.Parse()
 
-			result, err := test.sub.Route()
+			got, err := test.sub.Route()
 			if !errors.Is(err, test.want.err) {
-				t.Errorf("unexpected route error: %v, want %v", err, test.want.err)
+				t.Errorf("unexpected route err %v, want %v", err, test.want.err)
 			}
 
-			if result == nil {
+			if got == nil {
 				return
 			}
 
-			if fmt.Sprintf("%v", result.Fn) != fmt.Sprintf("%v", test.want.fn) {
-				t.Errorf("unexpected route fn result %v, want %v", result.Fn, test.want.fn)
+			if fmt.Sprintf("%v", got.Fn) != fmt.Sprintf("%v", test.want.fn) {
+				t.Errorf("unexpected route fn %v, want %v", got.Fn, test.want.fn)
 			}
 
-			if !errors.Is(result.Help, test.want.help) {
-				t.Errorf("unexpected route help result %v, want %v", result.Help, test.want.help)
+			if !errors.Is(got.Help, test.want.help) {
+				t.Errorf("unexpected route help %v, want %v", got.Help, test.want.help)
 			}
 		})
 	}
@@ -201,31 +228,8 @@ func TestRouteErrs(t *testing.T) {
 
 	flag.Parse()
 
-	if _, err := sub.Route(); !errors.Is(err, ErrArgInvalid) {
-		t.Errorf("unexpected route error %v, want %v", err, ErrArgInvalid)
-	}
-}
-
-func TestRun(t *testing.T) {
-	input := Sub{
-		"install": {
-			Help: mock.err,
-
-			Fn: func(*env.Env, []string) error {
-				return nil
-			},
-		},
-	}
-
-	os.Args = []string{
-		"malwatch",
-		"install",
-	}
-
-	flag.Parse()
-
-	if _, err := Run(input); err != nil {
-		t.Errorf("run error: %v", err)
+	if _, got := sub.Route(); !errors.Is(got, ErrArgInvalid) {
+		t.Errorf("unexpected route err %v, want %v", got, ErrArgInvalid)
 	}
 }
 
@@ -241,6 +245,6 @@ func TestPrint(t *testing.T) {
 	}
 
 	if err := input.Print(); err != nil {
-		t.Errorf("print error: %v", err)
+		t.Errorf("print err %v", err)
 	}
 }

@@ -14,20 +14,24 @@ import (
 func TestDo(t *testing.T) {
 	env, err := env.Mock(t.Name(), t.TempDir())
 	if err != nil {
-		t.Errorf("env mock error: %v", err)
+		t.Errorf("env mock err %v", err)
 	}
 
 	if err := sig.Mock(env, true); err != nil {
-		t.Errorf("sigs mock error: %v", err)
+		t.Errorf("sigs mock err %v", err)
 	}
 
 	env.Plat = preset.New(env)
 
-	if err := env.Plat.Load(); err != nil {
-		t.Error("preset load error: ", err)
+	if env.Cfg.Secrets.S3.Endpoint == "" {
+		t.Skip("s3 secret not stored")
 	}
 
-	if err := Do(env, nil); err != nil {
-		t.Error("print error: ", err)
+	if err := env.Plat.Load(env.Paths.Install.Root); err != nil {
+		t.Error("preset load err ", err)
+	}
+
+	if got := Do(env, nil); got != nil {
+		t.Error("do err ", got)
 	}
 }

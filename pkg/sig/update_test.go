@@ -13,82 +13,110 @@ import (
 	"github.com/defended-net/malwatch/pkg/boot/env/cfg/secret"
 	"github.com/defended-net/malwatch/pkg/boot/env/path"
 	"github.com/defended-net/malwatch/pkg/client/git"
+	"github.com/defended-net/malwatch/pkg/fsys"
 )
 
 func TestUpdate(t *testing.T) {
 	env, err := env.Mock(t.Name(), t.TempDir())
 	if err != nil {
-		t.Fatalf("env mock error: %v", err)
+		t.Fatalf("env mock err %v", err)
 	}
 
 	if err := Mock(env, true); err != nil {
-		t.Fatalf("sig mock error: %v", err)
+		t.Fatalf("sig mock err %v", err)
 	}
 
-	if err := Update(env); err != nil {
-		t.Errorf("update error: %v", err)
+	if got := Update(env); got != nil {
+		t.Errorf("update err %v", got)
 	}
 }
 
 func TestInstall(t *testing.T) {
 	env, err := env.Mock(t.Name(), t.TempDir())
 	if err != nil {
-		t.Fatalf("env mock error: %v", err)
+		t.Fatalf("env mock err %v", err)
 	}
 
 	if err := Mock(env, true); err != nil {
-		t.Fatalf("sig mock error: %v", err)
+		t.Fatalf("sig mock err %v", err)
 	}
 
 	if err := os.MkdirAll(env.Paths.Sigs.Tmp, 0700); err != nil {
-		t.Fatalf("sig dir make error: %v", err)
+		t.Fatalf("mkdir err %v", err)
 	}
 
-	yrSrc := filepath.Join(env.Paths.Sigs.Tmp, "src.yara")
+	yr := filepath.Join(env.Paths.Sigs.Tmp, "src.yr")
 
-	file, err := os.Create(yrSrc)
+	file, err := os.Create(yr)
 	if err != nil {
-		t.Fatalf("src file create error: %v", err)
+		t.Fatalf("file create err %v", err)
 	}
-	defer file.Close()
 
-	update := &update{
+	defer func() {
+		// lint
+		_ = file.Close()
+	}()
+
+	input := &update{
 		srcs: map[string][]string{
 			t.Name(): {
-				filepath.Base(yrSrc),
+				filepath.Base(yr),
 			},
 		},
 
 		paths: &path.Sigs{
-			Tmp: env.Paths.Sigs.Tmp,
-			Src: env.Paths.Sigs.Src,
+			Tmp:  env.Paths.Sigs.Tmp,
+			Src:  env.Paths.Sigs.Src,
+			Root: env.Paths.Install.Root,
 		},
 	}
 
-	if err := update.install(nil); err != nil {
-		t.Errorf("update error: %v", err)
+	if got := input.install(nil); got != nil {
+		t.Errorf("install err %v", got)
 	}
 }
 
 func TestInstallNoSrc(t *testing.T) {
 	env, err := env.Mock(t.Name(), t.TempDir())
 	if err != nil {
-		t.Fatalf("env mock error: %v", err)
+		t.Fatalf("env mock err %v", err)
 	}
 
-	update := &update{
+	input := &update{
 		srcs: map[string][]string{
-			t.Name(): {"missing.yara"},
+			t.Name(): {"missing.yr"},
 		},
 
 		paths: &path.Sigs{
-			Tmp: env.Paths.Sigs.Tmp,
-			Src: env.Paths.Sigs.Src,
+			Tmp:  env.Paths.Sigs.Tmp,
+			Src:  env.Paths.Sigs.Src,
+			Root: env.Paths.Install.Root,
 		},
 	}
 
-	if err := update.install(nil); err == nil {
-		t.Errorf("expected error, got nil")
+	if got := input.install(nil); got == nil {
+		t.Errorf("unexpected install success")
+	}
+}
+
+func TestInstallNilRoot(t *testing.T) {
+	var (
+		input = &update{
+			srcs: map[string][]string{
+				t.Name(): {"missing.yr"},
+			},
+
+			paths: &path.Sigs{
+				Tmp: "/tmp",
+				Src: "/tmp",
+			},
+		}
+
+		want = fsys.ErrPathRoot
+	)
+
+	if got := input.install(nil); !errors.Is(got, want) {
+		t.Errorf("unexpected install err %v, want %v", got, want)
 	}
 }
 
@@ -124,16 +152,38 @@ func TestCloneErrs(t *testing.T) {
 
 	for name, test := range tests {
 		t.Run(name, func(t *testing.T) {
-			update := &update{
+			var (
+				dir  = t.TempDir()
+				sigs = filepath.Join(dir, "sigs")
+				tmp  = filepath.Join(dir, "tmp", "sigs")
+			)
+
+			root, err := os.OpenRoot(dir)
+			if err != nil {
+				t.Fatalf("open root err %v", err)
+			}
+
+			defer func() {
+				// lint
+				_ = root.Close()
+			}()
+
+			if err := os.MkdirAll(tmp, 0700); err != nil {
+				t.Fatalf("mkdir err %v", err)
+			}
+
+			input := &update{
 				paths: &path.Sigs{
-					Tmp: t.TempDir(),
+					Dir:  sigs,
+					Tmp:  tmp,
+					Root: root,
 				},
 
 				secrets: test.input,
 			}
 
-			if err := update.clone(test.input.Git[0]); !errors.Is(err, test.want) {
-				t.Errorf("unexpected clone error: %v want %v", err, test.want)
+			if got := input.clone(test.input.Git[0]); !errors.Is(got, test.want) {
+				t.Errorf("unexpected clone err %v want %v", got, test.want)
 			}
 		})
 	}
@@ -142,10 +192,143 @@ func TestCloneErrs(t *testing.T) {
 func TestMock(t *testing.T) {
 	env, err := env.Mock(t.Name(), t.TempDir())
 	if err != nil {
-		t.Fatalf("env mock error: %v", err)
+		t.Fatalf("env mock err %v", err)
 	}
 
-	if err := Mock(env, true); err != nil {
-		t.Errorf("sig mock error: %v", err)
+	if got := Mock(env, true); got != nil {
+		t.Errorf("sig mock err %v", got)
+	}
+}
+
+func TestUpdateNoRepos(t *testing.T) {
+	want := ErrNoRepos
+
+	env, err := env.Mock(t.Name(), t.TempDir())
+	if err != nil {
+		t.Fatalf("env mock err %v", err)
+	}
+
+	env.Cfg.Secrets.Git = nil
+
+	if got := Update(env); !errors.Is(got, want) {
+		t.Errorf("unexpected update err %v, want %v", got, want)
+	}
+}
+
+func TestCloneNoRepoOwner(t *testing.T) {
+	var (
+		repo = &secret.Repo{URL: "/"}
+
+		input = &update{
+			paths: &path.Sigs{
+				Tmp: t.TempDir(),
+			},
+		}
+
+		want = ErrNoRepoOwner
+	)
+
+	if got := input.clone(repo); !errors.Is(got, want) {
+		t.Errorf("unexpected clone err %v, want %v", got, want)
+	}
+}
+
+func TestWalk(t *testing.T) {
+	var (
+		tmp  = t.TempDir()
+		yr   = filepath.Join(tmp, "rule.yr")
+		data = []byte("rule x { condition: true }")
+
+		input = &update{
+			paths: &path.Sigs{
+				Tmp: tmp,
+			},
+		}
+	)
+
+	if err := os.WriteFile(yr, data, 0600); err != nil {
+		t.Fatalf("file write err %v", err)
+	}
+
+	if err := input.walk(tmp); err != nil {
+		t.Errorf("walk err %v", err)
+	}
+
+	if len(input.srcs) == 0 {
+		t.Errorf("unexpected empty srcs")
+	}
+}
+
+func TestWalkErrs(t *testing.T) {
+	var (
+		dir = filepath.Join(t.TempDir(), "/not-exist")
+
+		input = &update{
+			paths: &path.Sigs{},
+		}
+	)
+
+	if got := input.walk(dir); got == nil {
+		t.Errorf("unexpected walk success")
+	}
+}
+
+func TestInstallParentTraverse(t *testing.T) {
+	tmp := t.TempDir()
+
+	root, err := os.OpenRoot(tmp)
+	if err != nil {
+		t.Fatalf("open root err %v", err)
+	}
+
+	defer func() {
+		// lint
+		_ = root.Close()
+	}()
+
+	input := &update{
+		paths: &path.Sigs{
+			Tmp:  filepath.Join(tmp, "tmp"),
+			Src:  filepath.Join(tmp, "src"),
+			Root: root,
+		},
+
+		srcs: map[string][]string{
+			"../escape": {"file.yr"},
+		},
+	}
+
+	if got := input.install(nil); got == nil {
+		t.Errorf("unexpected install success")
+	}
+}
+
+func TestInstallSrcTraverse(t *testing.T) {
+	tmp := t.TempDir()
+
+	root, err := os.OpenRoot(tmp)
+	if err != nil {
+		t.Fatalf("open root err %v", err)
+	}
+
+	defer func() {
+		// lint
+		_ = root.Close()
+	}()
+
+	input := &update{
+		paths: &path.Sigs{
+			Tmp:  filepath.Join(tmp),
+			Src:  filepath.Join(tmp, "src"),
+			Root: root,
+		},
+
+		srcs: map[string][]string{
+			"sub": {"../escape.yr"},
+		},
+	}
+
+	if got := input.install(nil); got == nil {
+		t.Errorf("unexpected install success")
 	}
 }

@@ -53,6 +53,7 @@ func Load(state *cmd.State) (*Env, error) {
 	// FUNCTIONAL PATHS
 	var (
 		cwd, bin = filepath.Split(self)
+		lock     = filepath.Join(cwd, bin+".lock")
 		conf     = filepath.Join(cwd, "cfg")
 		sigs     = filepath.Join(cwd, "sigs")
 		tmp      = filepath.Join(cwd, "tmp")
@@ -98,7 +99,14 @@ func Load(state *cmd.State) (*Env, error) {
 		Ver: ver,
 	}
 
-	if err := state.Lock(filepath.Join(cwd, bin+".lock")); err != nil {
+	env.Paths.Install.Root, err = os.OpenRoot(cwd)
+	if err != nil {
+		return nil, err
+	}
+
+	env.Paths.Sigs.Root = env.Paths.Install.Root
+
+	if err = state.Lock(env.Paths.Install.Root, lock); err != nil {
 		return nil, err
 	}
 
@@ -168,6 +176,13 @@ func Mock(name string, dir string) (*Env, error) {
 	}
 
 	env.Cfg = base
+
+	env.Paths.Install.Root, err = os.OpenRoot(dir)
+	if err != nil {
+		return nil, err
+	}
+
+	env.Paths.Sigs.Root = env.Paths.Install.Root
 
 	return env, nil
 }

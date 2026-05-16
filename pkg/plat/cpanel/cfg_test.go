@@ -11,7 +11,8 @@ import (
 
 func TestCfgLoad(t *testing.T) {
 	var (
-		path = filepath.Join(t.TempDir(), t.Name())
+		tmp  = t.TempDir()
+		path = filepath.Join(tmp, t.Name())
 
 		input = &Cfg{
 			path: path,
@@ -19,11 +20,21 @@ func TestCfgLoad(t *testing.T) {
 	)
 
 	if _, err := os.Create(path); err != nil {
-		t.Fatalf("file create error: %v", err)
+		t.Fatalf("file create err %v", err)
 	}
 
-	if err := input.Load(); err != nil {
-		t.Errorf("cfg load error: %v", err)
+	root, err := os.OpenRoot(tmp)
+	if err != nil {
+		t.Fatalf("open root err %v", err)
+	}
+
+	defer func() {
+		// lint
+		_ = root.Close()
+	}()
+
+	if got := input.Load(root); got != nil {
+		t.Errorf("cfg load err %v", got)
 	}
 }
 
@@ -41,6 +52,6 @@ func TestCfgPath(t *testing.T) {
 	)
 
 	if got != want {
-		t.Errorf("unexpected cfg path %v, want %v", got, want)
+		t.Errorf("unexpected cfg path result %v, want %v", got, want)
 	}
 }

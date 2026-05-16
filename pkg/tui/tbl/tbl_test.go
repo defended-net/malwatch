@@ -12,7 +12,8 @@ func TestPrepare(t *testing.T) {
 	tests := map[string]struct {
 		hdr   []string
 		input [][]string
-		want  struct {
+
+		want struct {
 			hdr  []string
 			rows [][]string
 		}
@@ -30,7 +31,7 @@ func TestPrepare(t *testing.T) {
 			},
 		},
 
-		"multiple": {
+		"compound": {
 			hdr: []string{
 				"header-a",
 				"header-b",
@@ -41,6 +42,7 @@ func TestPrepare(t *testing.T) {
 					"cell-a",
 					"cell-b",
 				},
+
 				{
 					"cell-c",
 					"cell-d",
@@ -57,8 +59,15 @@ func TestPrepare(t *testing.T) {
 				},
 
 				rows: [][]string{
-					{"cell-a", "cell-b"},
-					{"cell-c", "cell-d"},
+					{
+						"cell-a",
+						"cell-b",
+					},
+
+					{
+						"cell-c",
+						"cell-d",
+					},
 				},
 			},
 		},
@@ -88,12 +97,12 @@ func TestPrepare(t *testing.T) {
 		t.Run(name, func(t *testing.T) {
 			hdr, rows := Prepare(test.hdr, test.input)
 
-			if !reflect.DeepEqual(hdr, test.want.hdr) {
-				t.Errorf("unexpected header %v, want %v", hdr, test.want.hdr)
-			}
+			switch {
+			case !reflect.DeepEqual(hdr, test.want.hdr):
+				t.Errorf("unexpected header result %v, want %v", hdr, test.want.hdr)
 
-			if !reflect.DeepEqual(rows, test.want.rows) {
-				t.Errorf("unexpected header %v, want %v", rows, test.want.rows)
+			case !reflect.DeepEqual(rows, test.want.rows):
+				t.Errorf("unexpected header result %v, want %v", rows, test.want.rows)
 			}
 		})
 	}
@@ -109,7 +118,7 @@ func TestDisplay(t *testing.T) {
 			input: [][]string{{"row"}},
 		},
 
-		"multiple": {
+		"compound": {
 			hdr: []string{
 				"header-a",
 				"header-b",
@@ -145,9 +154,7 @@ func TestDisplay(t *testing.T) {
 		t.Run(name, func(t *testing.T) {
 			hdr, rows := Prepare(test.hdr, test.input)
 
-			if err := Print(t.Name(), hdr, rows); err != nil {
-				t.Errorf("unexpected display error %v", err)
-			}
+			Print(t.Name(), hdr, rows)
 		})
 	}
 }

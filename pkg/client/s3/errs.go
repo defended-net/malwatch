@@ -16,5 +16,11 @@ var (
 	ErrBktAdd = errors.New("s3: bucket add error")
 
 	// ErrObjGet means get error.
-	ErrObjGet = errors.New("s3: get error")
+	ErrObjGet = errors.New("s3: obj get error")
+
+	// ErrObjPut means put error.
+	ErrObjPut = errors.New("s3: obj put error")
+
+	// ErrObjClose means close error.
+	ErrObjClose = errors.New("s3: obj close error")
 )

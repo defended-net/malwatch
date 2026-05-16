@@ -17,59 +17,393 @@ import (
 	"golang.org/x/sys/unix"
 )
 
-func TestNewAttr(t *testing.T) {
-	file, err := os.OpenFile(filepath.Join(t.TempDir(), t.Name()), os.O_CREATE, 0600)
-	if err != nil {
-		t.Fatalf("file create error: %v", err)
+func TestOpen(t *testing.T) {
+	input := filepath.Join(t.TempDir(), t.Name())
+
+	if _, err := os.Create(input); err != nil {
+		t.Fatalf("file create err %v", err)
 	}
 
-	stat := &unix.Stat_t{}
-
-	if err := unix.Stat(file.Name(), stat); err != nil {
-		t.Fatalf("stat error: %v", err)
+	fd, stat, got := Open(input)
+	if got != nil {
+		t.Errorf("file open err %v", got)
 	}
+	defer CloseFd(fd)
 
-	result := NewAttr(stat)
-
-	want := &Attr{
-		UID:   int(stat.Uid),
-		GID:   int(stat.Gid),
-		Mode:  fs.FileMode(stat.Mode).Perm(),
-		CTime: time.Unix(stat.Ctim.Sec, stat.Ctim.Nsec).UTC(),
-		MTime: time.Unix(stat.Mtim.Sec, stat.Ctim.Nsec).UTC(),
-	}
-
-	if !reflect.DeepEqual(result, want) {
-		t.Fatalf("unexpected attr: %v, want %v", result, want)
+	if stat == nil {
+		t.Errorf("nil stat")
 	}
 }
 
-func TestQuarantinePath(t *testing.T) {
-	var (
-		dir  = t.TempDir()
-		path = "/tmp/file"
-		got  = QuarantinePath(dir, path)
-	)
+func TestOpenErrs(t *testing.T) {
+	want := ErrPathTraverse
 
-	if !strings.HasPrefix(got, dir) {
-		t.Errorf("unexpected quarantine path: got %v, want prefix %v", got, dir)
+	if _, _, got := Open("/../etc/passwd"); !errors.Is(got, want) {
+		t.Errorf("unexpected file open err %v, want %v", got, want)
+	}
+}
+
+func TestOpenFile(t *testing.T) {
+	input := filepath.Join(t.TempDir(), t.Name())
+
+	fd, _, got := OpenFile(input, unix.O_WRONLY|unix.O_CREAT)
+	if got != nil {
+		t.Errorf("open file err %v", got)
+	}
+	defer CloseFd(fd)
+}
+
+func TestOpenFileErrs(t *testing.T) {
+	tests := map[string]struct {
+		input func(t *testing.T) string
+		want  error
+	}{
+		"not-exist": {
+			input: func(t *testing.T) string {
+				return filepath.Join(t.TempDir(), "not-exist", "file")
+			},
+
+			want: ErrFileOpen,
+		},
+
+		"dir": {
+			input: func(t *testing.T) string {
+				return t.TempDir()
+			},
+
+			want: ErrIsNotReg,
+		},
+	}
+
+	for name, test := range tests {
+		t.Run(name, func(t *testing.T) {
+			if _, _, got := OpenFile(test.input(t), unix.O_RDONLY); !errors.Is(got, test.want) {
+				t.Errorf("unexpected file open err %v, want %v", got, test.want)
+			}
+		})
+	}
+}
+
+func TestUnlink(t *testing.T) {
+	tests := map[string]struct {
+		fn  func(t *testing.T) string
+		dir bool
+	}{
+		"file": {
+			fn: func(t *testing.T) string {
+				input := filepath.Join(t.TempDir(), "file")
+
+				if _, err := os.Create(input); err != nil {
+					t.Fatalf("file create err %v", err)
+				}
+
+				return input
+			},
+
+			dir: false,
+		},
+
+		"dir": {
+			fn: func(t *testing.T) string {
+				input := filepath.Join(t.TempDir(), "dir")
+
+				if err := os.Mkdir(input, 0700); err != nil {
+					t.Fatalf("mkdir err %v", err)
+				}
+
+				return input
+			},
+
+			dir: true,
+		},
+	}
+
+	for name, test := range tests {
+		t.Run(name, func(t *testing.T) {
+			var (
+				input = test.fn(t)
+				want  = os.ErrNotExist
+			)
+
+			if err := Unlink(input, test.dir); err != nil {
+				t.Errorf("unlink err %v", err)
+			}
+
+			if _, got := os.Stat(input); !errors.Is(got, want) {
+				t.Errorf("stat err %v, want %v", got, want)
+			}
+		})
+	}
+}
+
+func TestUnlinkErrs(t *testing.T) {
+	tests := map[string]struct {
+		fn   func(t *testing.T) string
+		dir  bool
+		want error
+	}{
+		"dot-dots": {
+			fn: func(_ *testing.T) string {
+				return "/../etc/passwd"
+			},
+
+			dir:  false,
+			want: ErrPathTraverse,
+		},
+
+		"not-exist": {
+			fn: func(t *testing.T) string {
+				return filepath.Join(t.TempDir(), "not-exist", "file")
+			},
+
+			dir:  false,
+			want: ErrFileOpen,
+		},
+
+		"not-reg": {
+			fn: func(t *testing.T) string {
+				path := filepath.Join(t.TempDir(), "dir")
+
+				if err := os.Mkdir(path, 0700); err != nil {
+					t.Fatalf("mkdir err %v", err)
+				}
+
+				return path
+			},
+
+			dir:  false,
+			want: ErrIsNotReg,
+		},
+
+		"not-dir": {
+			fn: func(t *testing.T) string {
+				path := filepath.Join(t.TempDir(), "file")
+
+				if _, err := os.Create(path); err != nil {
+					t.Fatalf("file create err %v", err)
+				}
+
+				return path
+			},
+
+			dir:  true,
+			want: ErrIsNotDir,
+		},
+	}
+
+	for name, test := range tests {
+		t.Run(name, func(t *testing.T) {
+			if got := Unlink(test.fn(t), test.dir); !errors.Is(got, test.want) {
+				t.Errorf("unexpected unlink err %v, want %v", got, test.want)
+			}
+		})
+	}
+}
+
+func TestClose(t *testing.T) {
+	tests := map[string]struct {
+		preClose bool
+	}{
+		"open": {
+			preClose: false,
+		},
+
+		"closed": {
+			// Logs error.
+			preClose: true,
+		},
+	}
+
+	for name, test := range tests {
+		t.Run(name, func(t *testing.T) {
+			file, err := os.Create(filepath.Join(t.TempDir(), "file"))
+			if err != nil {
+				t.Fatalf("file create err %v", err)
+			}
+
+			if test.preClose {
+				if err := file.Close(); err != nil {
+					t.Fatalf("file close err %v", err)
+				}
+			}
+
+			Close(file)
+		})
+	}
+}
+
+func TestCloseFd(t *testing.T) {
+	file, err := os.Create(filepath.Join(t.TempDir(), t.Name()))
+	if err != nil {
+		t.Fatalf("file create err %v", err)
+	}
+
+	tests := map[string]struct {
+		fd int
+	}{
+		"ok": {
+			fd: int(file.Fd()),
+		},
+
+		"stdin": {
+			fd: 0,
+		},
+
+		"stdout": {
+			fd: 1,
+		},
+
+		"stderr": {
+			fd: 2,
+		},
+
+		"invalid": {
+			fd: 99999,
+		},
+	}
+
+	for name, test := range tests {
+		t.Run(name, func(_ *testing.T) {
+			CloseFd(test.fd)
+		})
 	}
 }
 
 func TestMv(t *testing.T) {
-	file, err := os.Create(filepath.Join(t.TempDir(), t.Name()))
-	if err != nil {
-		t.Fatalf("file create error: %v", err)
-	}
-
 	attr := &Attr{
 		UID:  os.Getuid(),
 		GID:  os.Getgid(),
 		Mode: 0600,
 	}
 
-	if err := Mv(file.Name(), filepath.Join(t.TempDir(), t.Name()), attr); err != nil {
-		t.Errorf("mv error: %v", err)
+	tests := map[string]struct {
+		fn   func(t *testing.T) (src, dst string)
+		attr *Attr
+	}{
+		"reg": {
+			fn: func(t *testing.T) (string, string) {
+				input := filepath.Join(t.TempDir(), "src")
+
+				if _, err := os.Create(input); err != nil {
+					t.Fatalf("file create err %v", err)
+				}
+
+				return input, filepath.Join(t.TempDir(), "dst")
+			},
+
+			attr: attr,
+		},
+
+		"match": {
+			fn: func(t *testing.T) (string, string) {
+				input := filepath.Join(t.TempDir(), "file")
+
+				if _, err := os.Create(input); err != nil {
+					t.Fatalf("file create err %v", err)
+				}
+
+				return input, input
+			},
+
+			attr: attr,
+		},
+
+		"dst-par-missing": {
+			fn: func(t *testing.T) (string, string) {
+				input := filepath.Join(t.TempDir(), "src")
+
+				if _, err := os.Create(input); err != nil {
+					t.Fatalf("file create err %v", err)
+				}
+
+				return input, filepath.Join(t.TempDir(), "dst", "file")
+			},
+
+			attr: attr,
+		},
+
+		"no-attr": {
+			fn: func(t *testing.T) (string, string) {
+				input := filepath.Join(t.TempDir(), "src")
+
+				if _, err := os.Create(input); err != nil {
+					t.Fatalf("file create err %v", err)
+				}
+
+				return input, filepath.Join(t.TempDir(), "dst")
+			},
+
+			attr: nil,
+		},
+	}
+
+	for name, test := range tests {
+		t.Run(name, func(t *testing.T) {
+			src, dst := test.fn(t)
+
+			if got := Mv(src, dst, test.attr); got != nil {
+				t.Errorf("mv err %v", got)
+			}
+		})
+	}
+}
+
+func TestMvErrs(t *testing.T) {
+	tests := map[string]struct {
+		fn   func(t *testing.T) (src, dst string)
+		attr *Attr
+		want error
+	}{
+		"dir": {
+			fn: func(t *testing.T) (string, string) {
+				input := filepath.Join(t.TempDir(), "src")
+
+				if err := os.Mkdir(input, 0700); err != nil {
+					t.Fatalf("mkdir err %v", err)
+				}
+
+				return input, filepath.Join(t.TempDir(), "dst")
+			},
+
+			want: ErrIsDir,
+		},
+
+		"src-missing": {
+			fn: func(t *testing.T) (string, string) {
+				return filepath.Join(t.TempDir(), "src"), filepath.Join(t.TempDir(), "dst")
+			},
+
+			want: ErrStat,
+		},
+
+		"dot-dots": {
+			fn: func(_ *testing.T) (string, string) {
+				return "/../etc/passwd", "/tmp/x"
+			},
+
+			want: ErrPathTraverse,
+		},
+
+		"stat": {
+			fn: func(_ *testing.T) (string, string) {
+				input := filepath.Join("/dev/null", "file")
+
+				return input, input
+			},
+
+			attr: &Attr{},
+			want: ErrStat,
+		},
+	}
+
+	for name, test := range tests {
+		t.Run(name, func(t *testing.T) {
+			src, dst := test.fn(t)
+
+			if got := Mv(src, dst, test.attr); !errors.Is(got, test.want) {
+				t.Errorf("unexpected mv err %v, want %v", got, test.want)
+			}
+		})
 	}
 }
 
@@ -83,7 +417,7 @@ func TestMvPathErrs(t *testing.T) {
 			want:  ErrPathRoot,
 		},
 
-		"relative": {
+		"rel": {
 			input: "dev/null/file",
 			want:  ErrPathNotAbs,
 		},
@@ -102,96 +436,292 @@ func TestMvPathErrs(t *testing.T) {
 				Mode: 0600,
 			}
 
-			if err := Mv(test.input, test.input, attr); !errors.Is(err, test.want) {
-				t.Errorf("unexpected mv error: %v", err)
+			if got := Mv(test.input, test.input, attr); !errors.Is(got, test.want) {
+				t.Errorf("unexpected mv err %v", got)
 			}
 		})
 	}
 }
 
-func TestMvErrs(t *testing.T) {
+func TestMvAt(t *testing.T) {
 	var (
-		input = "/dev/null/" + t.Name()
-		want  = ErrStat
-	)
+		dir = t.TempDir()
+		src = filepath.Join(dir, "src")
+		dst = filepath.Join(dir, "dst", "dst")
 
-	if err := Mv(input, input, &Attr{}); !errors.Is(err, want) {
-		t.Errorf("unexpected mv error: %v, want %v", err, "not a directory")
-	}
-}
-
-func TestWalk(t *testing.T) {
-	var (
-		dir  = t.TempDir()
-		path = filepath.Join(dir, t.Name())
-
-		want = []string{
-			path,
+		attr = &Attr{
+			UID:  os.Getuid(),
+			GID:  os.Getgid(),
+			Mode: 0600,
 		}
 	)
 
-	if _, err := os.Create(path); err != nil {
-		t.Fatalf("file open error: %v", err)
+	if err := os.WriteFile(src, []byte(t.Name()), 0600); err != nil {
+		t.Fatalf("file write err %v", err)
 	}
 
-	result, err := Walk(dir)
+	if err := os.MkdirAll(filepath.Dir(dst), 0700); err != nil {
+		t.Fatalf("mkdir err %v", err)
+	}
+
+	root, err := os.OpenRoot(dir)
 	if err != nil {
-		t.Fatalf("walk error: %v", err)
+		t.Fatalf("open root err %v", err)
 	}
 
-	if !slices.Equal(result, []string{path}) {
-		t.Fatalf("unexpected walk result %v, want %v", result, want)
+	defer func() {
+		// lint
+		_ = root.Close()
+	}()
+
+	if got := MvAt(root, src, dst, attr); got != nil {
+		t.Errorf("mv err %v", got)
+	}
+
+	if _, err := os.Stat(dst); err != nil {
+		t.Errorf("stat err %v", err)
+	}
+
+	if _, err := os.Stat(src); err == nil {
+		t.Errorf("src exist")
 	}
 }
 
-func TestWalkErrs(t *testing.T) {
-	if _, err := Walk(t.Name()); !errors.Is(err, ErrWalk) {
-		t.Errorf("unexpected walk error: %v", err)
-	}
-}
-
-func TestWalkByExt(t *testing.T) {
+func TestMvAtSameTarget(t *testing.T) {
 	var (
-		dir  = t.TempDir()
-		path = filepath.Join(dir, t.Name()+".ext")
-
-		want = []string{
-			path,
-		}
+		tmp   = t.TempDir()
+		input = filepath.Join(tmp, "file")
 	)
 
-	if _, err := os.Create(path); err != nil {
-		t.Fatalf("file open error: %v", err)
+	if _, err := os.Create(input); err != nil {
+		t.Fatalf("file create err %v", err)
 	}
 
-	if _, err := os.Create(path + ".txe"); err != nil {
-		t.Fatalf("file open error: %v", err)
-	}
-
-	result, err := WalkByExt(dir, ".ext")
+	root, err := os.OpenRoot(tmp)
 	if err != nil {
-		t.Fatalf("walk by ext error: %v", err)
+		t.Fatalf("open root err %v", err)
 	}
 
-	if !slices.Equal(result, []string{path}) {
-		t.Errorf("unexpected walk by ext result %v, want %v", result, want)
-	}
-}
+	defer func() {
+		// lint
+		_ = root.Close()
+	}()
 
-func TestWalkByExtErrs(t *testing.T) {
-	want := ErrWalk
-
-	result, err := WalkByExt(t.Name(), ".ext")
-	if len(result) != 0 {
-		t.Fatalf("unexpected walk by ext result %v", result)
-	}
-
-	if !errors.Is(err, want) {
-		t.Errorf("unexpected walk by ext error: %v, want %v", err, want)
+	if got := MvAt(root, input, input, nil); got != nil {
+		t.Errorf("mv err %v", got)
 	}
 }
 
-func TestGetMntPoint(t *testing.T) {
+func TestMvAtErrs(t *testing.T) {
+	tests := map[string]struct {
+		fn   func(t *testing.T) (root *os.Root, src, dst string)
+		want error
+	}{
+		"nil-root": {
+			fn: func(_ *testing.T) (*os.Root, string, string) {
+				return nil, "src", "dst"
+			},
+
+			want: ErrPathRoot,
+		},
+
+		"not-local": {
+			fn: func(t *testing.T) (*os.Root, string, string) {
+				root, err := os.OpenRoot(t.TempDir())
+				if err != nil {
+					t.Fatalf("open root err %v", err)
+				}
+
+				t.Cleanup(func() {
+					// lint
+					_ = root.Close()
+				})
+
+				return root, "../escape", "dst"
+			},
+
+			want: ErrPathLocal,
+		},
+
+		"sym": {
+			fn: func(t *testing.T) (*os.Root, string, string) {
+				var (
+					tmp    = t.TempDir()
+					target = filepath.Join(tmp, "target")
+					src    = filepath.Join(tmp, "src.yar")
+					dst    = filepath.Join(tmp, "dst.yar")
+				)
+
+				if err := os.WriteFile(target, []byte(t.Name()), 0600); err != nil {
+					t.Fatalf("file write err %v", err)
+				}
+
+				if err := os.Symlink(target, src); err != nil {
+					t.Fatalf("symlink err %v", err)
+				}
+
+				root, err := os.OpenRoot(tmp)
+				if err != nil {
+					t.Fatalf("open root err %v", err)
+				}
+
+				t.Cleanup(func() {
+					// lint
+					_ = root.Close()
+				})
+
+				t.Cleanup(func() {
+					if _, err := os.Lstat(src); err != nil {
+						t.Errorf("lstat err %v", err)
+					}
+
+					if _, err := os.Lstat(dst); err == nil {
+						t.Errorf("dst created from sym")
+					}
+				})
+
+				return root, src, dst
+			},
+
+			want: ErrIsNotReg,
+		},
+
+		"dir": {
+			fn: func(t *testing.T) (*os.Root, string, string) {
+				var (
+					tmp = t.TempDir()
+					src = filepath.Join(tmp, "src")
+					dst = filepath.Join(tmp, "dst")
+				)
+
+				if err := os.Mkdir(src, 0700); err != nil {
+					t.Fatalf("mkdir err %v", err)
+				}
+
+				root, err := os.OpenRoot(tmp)
+				if err != nil {
+					t.Fatalf("open root err %v", err)
+				}
+
+				t.Cleanup(func() {
+					// lint
+					_ = root.Close()
+				})
+
+				return root, src, dst
+			},
+
+			want: ErrIsNotReg,
+		},
+	}
+
+	for name, test := range tests {
+		t.Run(name, func(t *testing.T) {
+			root, src, dst := test.fn(t)
+
+			if got := MvAt(root, src, dst, nil); !errors.Is(got, test.want) {
+				t.Errorf("unexpected mv err %v, want %v", got, test.want)
+			}
+		})
+	}
+}
+
+func TestRootName(t *testing.T) {
+	tests := map[string]struct {
+		path func(tmp string) string
+		want string
+	}{
+		"file": {
+			path: func(tmp string) string {
+				return filepath.Join(tmp, "file")
+			},
+
+			want: "file",
+		},
+
+		"tmp": {
+			path: func(tmp string) string {
+				return tmp
+			},
+		},
+
+		"dot": {
+			path: func(_ string) string {
+				return "."
+			},
+		},
+	}
+
+	for name, test := range tests {
+		t.Run(name, func(t *testing.T) {
+			tmp := t.TempDir()
+
+			root, err := os.OpenRoot(tmp)
+			if err != nil {
+				t.Fatalf("open root err %v", err)
+			}
+
+			defer func() {
+				// lint
+				_ = root.Close()
+			}()
+
+			got, err := RootName(root, test.path(tmp))
+			if err != nil {
+				t.Fatalf("root filename err %v", err)
+			}
+
+			if test.want != "" && got != test.want {
+				t.Errorf("unexpected root name %v, want %v", got, test.want)
+			}
+		})
+	}
+}
+
+func TestRootNameErrs(t *testing.T) {
+	tests := map[string]struct {
+		fn   func(t *testing.T) (root *os.Root, path string)
+		want error
+	}{
+		"nil-root": {
+			fn: func(t *testing.T) (*os.Root, string) {
+				return nil, t.Name()
+			},
+
+			want: ErrPathRoot,
+		},
+
+		"not-local": {
+			fn: func(t *testing.T) (*os.Root, string) {
+				root, err := os.OpenRoot(t.TempDir())
+				if err != nil {
+					t.Fatalf("open root err %v", err)
+				}
+
+				t.Cleanup(func() {
+					// lint
+					_ = root.Close()
+				})
+
+				return root, "../escape"
+			},
+
+			want: ErrPathLocal,
+		},
+	}
+
+	for name, test := range tests {
+		t.Run(name, func(t *testing.T) {
+			root, path := test.fn(t)
+
+			if _, got := RootName(root, path); !errors.Is(got, test.want) {
+				t.Errorf("unexpected root name err %v, want %v", got, test.want)
+			}
+		})
+	}
+}
+
+func TestMntPoint(t *testing.T) {
 	tests := map[string]struct {
 		input string
 		want  string
@@ -200,21 +730,214 @@ func TestGetMntPoint(t *testing.T) {
 			input: "/",
 			want:  "/",
 		},
+
+		// /proc normally diff fs from /
+		"diff-dev": {
+			input: "/proc/self",
+		},
 	}
 
 	for name, test := range tests {
 		t.Run(name, func(t *testing.T) {
-			result, err := MntPoint(test.input)
+			got, err := MntPoint(test.input)
 			if err != nil {
-				t.Fatalf("get mnt point error: %v", err)
+				t.Fatalf("mnt point err %v", err)
 			}
 
-			if result != test.want {
-				t.Errorf("unexpected get mnt point result %v, want %v", result, test.want)
+			if test.want != "" && got != test.want {
+				t.Errorf("unexpected mnt point result %v, want %v", got, test.want)
+			}
+
+			if got == "" {
+				t.Errorf("empty mnt point")
 			}
 		})
 	}
 }
+
+func TestMntPointErrs(t *testing.T) {
+	tests := map[string]struct {
+		input string
+		want  error
+	}{
+		"not-exist": {
+			input: "/dev/null/not-exist",
+			want:  ErrStat,
+		},
+
+		"name": {
+			input: t.Name(),
+			want:  ErrStat,
+		},
+	}
+
+	for name, test := range tests {
+		t.Run(name, func(t *testing.T) {
+			if _, got := MntPoint(test.input); !errors.Is(got, test.want) {
+				t.Errorf("unexpected mnt point err %v, want %v", got, test.want)
+			}
+		})
+	}
+}
+
+func TestNewAttr(t *testing.T) {
+	file, err := os.OpenFile(filepath.Join(t.TempDir(), t.Name()), os.O_CREATE, 0600)
+	if err != nil {
+		t.Fatalf("file open err %v", err)
+	}
+
+	stat := &unix.Stat_t{}
+
+	if err := unix.Stat(file.Name(), stat); err != nil {
+		t.Fatalf("stat err %v", err)
+	}
+
+	var (
+		got = NewAttr(stat)
+
+		want = &Attr{
+			UID:   int(stat.Uid),
+			GID:   int(stat.Gid),
+			Mode:  fs.FileMode(stat.Mode).Perm(),
+			CTime: time.Unix(stat.Ctim.Sec, stat.Ctim.Nsec).UTC(),
+			MTime: time.Unix(stat.Mtim.Sec, stat.Ctim.Nsec).UTC(),
+		}
+	)
+
+	if !reflect.DeepEqual(got, want) {
+		t.Fatalf("unexpected create attr result %v, want %v", got, want)
+	}
+}
+
+func TestQuarantinePath(t *testing.T) {
+	tests := map[string]struct {
+		dir  func(t *testing.T) string
+		path func(dir string) string
+	}{
+		"missing-dir": {
+			dir: func(_ *testing.T) string {
+				return "/quarantine"
+			},
+
+			path: func(_ string) string {
+				return "/file"
+			},
+		},
+
+		"tmp": {
+			dir: func(t *testing.T) string {
+				return t.TempDir()
+			},
+
+			path: func(_ string) string {
+				return "/tmp/file"
+			},
+		},
+
+		"sub": {
+			dir: func(t *testing.T) string {
+				return t.TempDir()
+			},
+
+			path: func(dir string) string {
+				return filepath.Join(dir, "file")
+			},
+		},
+	}
+
+	for name, test := range tests {
+		t.Run(name, func(t *testing.T) {
+			var (
+				tmp = test.dir(t)
+				got = QuarantinePath(tmp, test.path(tmp))
+			)
+
+			switch {
+			case got == "":
+				t.Errorf("empty quarantine path")
+
+			case !strings.HasPrefix(got, tmp):
+				t.Errorf("unexpected quarantine path %v, want prefix %v", got, tmp)
+			}
+		})
+	}
+}
+
+func TestWalk(t *testing.T) {
+	var (
+		tmp  = t.TempDir()
+		path = filepath.Join(tmp, t.Name())
+
+		want = []string{
+			path,
+		}
+	)
+
+	if _, err := os.Create(path); err != nil {
+		t.Fatalf("file open err %v", err)
+	}
+
+	got, err := Walk(tmp)
+	if err != nil {
+		t.Fatalf("walk err %v", err)
+	}
+
+	if !slices.Equal(got, []string{path}) {
+		t.Fatalf("unexpected walk result %v, want %v", got, want)
+	}
+}
+
+func TestWalkErrs(t *testing.T) {
+	want := ErrWalk
+
+	if _, got := Walk(t.Name()); !errors.Is(got, want) {
+		t.Errorf("unexpected walk err %v, want %v", got, want)
+	}
+}
+
+func TestWalkByExt(t *testing.T) {
+	var (
+		tmp  = t.TempDir()
+		path = filepath.Join(tmp, t.Name()+".ext")
+
+		want = []string{
+			path,
+		}
+	)
+
+	if _, err := os.Create(path); err != nil {
+		t.Fatalf("file create err %v", err)
+	}
+
+	if _, err := os.Create(path + ".txe"); err != nil {
+		t.Fatalf("file create err %v", err)
+	}
+
+	got, err := WalkByExt(tmp, ".ext")
+	if err != nil {
+		t.Fatalf("walk by ext err %v", err)
+	}
+
+	if !slices.Equal(got, []string{path}) {
+		t.Errorf("unexpected walk by ext result %v, want %v", got, want)
+	}
+}
+
+func TestWalkByExtErrs(t *testing.T) {
+	var (
+		got, err = WalkByExt(t.Name(), ".ext")
+		want     = ErrWalk
+	)
+
+	if len(got) != 0 {
+		t.Fatalf("unexpected walk by ext result %v", got)
+	}
+
+	if !errors.Is(err, want) {
+		t.Errorf("unexpected walk by ext err %v, want %v", err, want)
+	}
+}
+
 func TestHasDotDots(t *testing.T) {
 	tests := map[string]struct {
 		input string
@@ -230,17 +953,17 @@ func TestHasDotDots(t *testing.T) {
 			want:  ErrPathNotAbs,
 		},
 
-		"rel-prefix": {
+		"rel-pfx": {
 			input: "../",
-			want:  ErrPathTravers,
+			want:  ErrPathTraverse,
 		},
 
-		"rel-prefix-abs": {
+		"rel-pfx-abs": {
 			input: "/../",
-			want:  ErrPathTravers,
+			want:  ErrPathTraverse,
 		},
 
-		"zero-length": {
+		"zero-len": {
 			input: "",
 			want:  ErrPathNotAbs,
 		},
@@ -248,33 +971,10 @@ func TestHasDotDots(t *testing.T) {
 
 	for name, test := range tests {
 		t.Run(name, func(t *testing.T) {
-			if err := HasDotDots(test.input); !errors.Is(err, test.want) {
-				t.Errorf("unexpected has dot dots result %v, want %v", err, test.want)
+			if got := HasDotDots(test.input); !errors.Is(got, test.want) {
+				t.Errorf("unexpected has dot dots result %v, want %v", got, test.want)
 			}
 		})
-	}
-}
-
-func TestGetMntPointErrs(t *testing.T) {
-	var (
-		input = t.Name()
-		want  = ErrStat
-	)
-
-	if _, got := MntPoint(input); !errors.Is(got, want) {
-		t.Errorf("unexpected get mnt point error: %v", got)
-	}
-}
-
-func TestGetQuarantinePath(t *testing.T) {
-	var (
-		dir  = t.TempDir()
-		want = filepath.Join(dir, t.Name())
-		got  = QuarantinePath(dir, want)
-	)
-
-	if !strings.HasPrefix(got, dir) {
-		t.Errorf("unexpected quarantine path: %v, want %v", got, want)
 	}
 }
 
@@ -284,7 +984,7 @@ func TestIsRel(t *testing.T) {
 		path  string
 		want  bool
 	}{
-		"relative": {
+		"rel": {
 			input: "/test/test/a.ext",
 			path:  "/test/test",
 			want:  true,
@@ -295,74 +995,336 @@ func TestIsRel(t *testing.T) {
 			path:  "/test/test",
 			want:  false,
 		},
+
+		"non-abs": {
+			input: "/a",
+			path:  "./b/c",
+			want:  false,
+		},
 	}
 
 	for name, test := range tests {
 		t.Run(name, func(t *testing.T) {
-			if result := IsRel(test.input, test.path); result != test.want {
-				t.Errorf("unexpected is relative result %v, want %v", result, test.want)
+			if got := IsRel(test.input, test.path); got != test.want {
+				t.Errorf("unexpected is rel result %v, want %v", got, test.want)
 			}
 		})
 	}
 }
 
-func TestIsRelErrs(t *testing.T) {
-	if result := IsRel("/a", "./b/c"); result != false {
-		t.Errorf("unexpected is relative result %v, want %v", result, false)
-	}
-}
-
-func TestIsExpired(t *testing.T) {
-	input := filepath.Join(t.TempDir(), t.Name())
-
-	file, err := os.Create(input)
-	if err != nil {
-		t.Fatalf("file create error: %s", err)
-	}
-	defer file.Close()
-
-	if result, _ := IsExp(time.Now().Add(time.Hour*24), int(file.Fd())); result != true {
-		t.Errorf("unexpected is expired result %v, want %v", result, true)
-	}
-}
-
-func TestIsExpiredTimestomp(t *testing.T) {
+func TestIsExp(t *testing.T) {
 	tests := map[string]struct {
-		input time.Time
+		mtime func() time.Time
+		ttl   func() time.Time
 		want  bool
 	}{
-		"under": {
-			input: time.Now(),
-			want:  false,
+		"exp": {
+			mtime: nil,
+
+			ttl: func() time.Time {
+				return time.Now().Add(time.Hour * 24)
+			},
+
+			want: true,
 		},
 
-		"over": {
-			input: time.Now().Add(-(time.Hour * 25)),
-			want:  false,
+		"stomp-under": {
+			mtime: func() time.Time {
+				return time.Now()
+			},
+
+			ttl: func() time.Time {
+				return time.Now().Add(-(time.Hour * 24))
+			},
+
+			want: false,
 		},
-	}
 
-	path := filepath.Join(t.TempDir(), t.Name())
+		"stomp-over": {
+			mtime: func() time.Time {
+				return time.Now().Add(-(time.Hour * 25))
+			},
 
-	if _, err := os.Create(path); err != nil {
-		t.Fatalf("file create error: %s", err)
+			ttl: func() time.Time {
+				return time.Now().Add(-(time.Hour * 24))
+			},
+
+			want: false,
+		},
 	}
 
 	for name, test := range tests {
 		t.Run(name, func(t *testing.T) {
-			if err := os.Chtimes(path, time.Now(), test.input); err != nil {
-				t.Errorf("mtime alert error: %s", err)
+			input := filepath.Join(t.TempDir(), "file")
+
+			if _, err := os.Create(input); err != nil {
+				t.Fatalf("file create err %s", err)
 			}
 
-			file, err := os.Open(path)
+			if test.mtime != nil {
+				if err := os.Chtimes(input, time.Now(), test.mtime()); err != nil {
+					t.Errorf("chtimes err %s", err)
+				}
+			}
+
+			file, err := os.Open(input)
 			if err != nil {
-				t.Fatalf("file open error: %s", err)
+				t.Fatalf("file open err %s", err)
 			}
-			defer file.Close()
 
-			if result, _ := IsExp(time.Now().Add(-(time.Hour * 24)), int(file.Fd())); result != test.want {
-				t.Errorf("unexpected is expired timestomp result %v, want %v", result, test.want)
+			defer func() {
+				// lint
+				_ = file.Close()
+			}()
+
+			if got, _ := IsExp(test.ttl(), int(file.Fd())); got != test.want {
+				t.Errorf("unexpected is exp result %v, want %v", got, test.want)
 			}
 		})
+	}
+}
+
+func TestIsExpErrs(t *testing.T) {
+	got, stat := IsExp(time.Now(), -1)
+	if got {
+		t.Errorf("unexpected is exp result %v, want false", got)
+	}
+
+	if stat != nil {
+		t.Errorf("unexpected stat %v, want nil", stat)
+	}
+}
+
+func TestMvToRoot(t *testing.T) {
+	attr := &Attr{
+		UID:  os.Getuid(),
+		GID:  os.Getgid(),
+		Mode: 0600,
+	}
+
+	tests := map[string]struct {
+		attr *Attr
+	}{
+		"basic": {
+			attr: attr,
+		},
+
+		"no-attr": {
+			attr: nil,
+		},
+	}
+
+	for name, test := range tests {
+		t.Run(name, func(t *testing.T) {
+			var (
+				srcDir = t.TempDir()
+				dstDir = t.TempDir()
+				src    = filepath.Join(srcDir, "src")
+				dst    = filepath.Join(dstDir, "sub", "dst")
+			)
+
+			if err := os.WriteFile(src, []byte(t.Name()), 0600); err != nil {
+				t.Fatalf("file write err %v", err)
+			}
+
+			root, err := os.OpenRoot(dstDir)
+			if err != nil {
+				t.Fatalf("open root err %v", err)
+			}
+
+			defer func() {
+				// lint
+				_ = root.Close()
+			}()
+
+			if got := MvToRoot(root, src, dst, test.attr); got != nil {
+				t.Errorf("mv to root err %v", got)
+			}
+
+			if _, err := os.Stat(dst); err != nil {
+				t.Errorf("stat err %v", err)
+			}
+
+			if _, err := os.Stat(src); err == nil {
+				t.Errorf("src exist")
+			}
+		})
+	}
+}
+
+func TestMvToRootErrs(t *testing.T) {
+	tests := map[string]struct {
+		fn   func(t *testing.T) (root *os.Root, src, dst string)
+		want error
+	}{
+		"nil-root": {
+			fn: func(_ *testing.T) (*os.Root, string, string) {
+				return nil, "/src", "/dst"
+			},
+
+			want: ErrPathRoot,
+		},
+
+		"dot-dots": {
+			fn: func(t *testing.T) (*os.Root, string, string) {
+				root, err := os.OpenRoot(t.TempDir())
+				if err != nil {
+					t.Fatalf("open root err %v", err)
+				}
+
+				t.Cleanup(func() {
+					// lint
+					_ = root.Close()
+				})
+
+				return root, "/../etc/passwd", "dst"
+			},
+
+			want: ErrPathTraverse,
+		},
+
+		"not-local": {
+			fn: func(t *testing.T) (*os.Root, string, string) {
+				root, err := os.OpenRoot(t.TempDir())
+				if err != nil {
+					t.Fatalf("open root err %v", err)
+				}
+
+				t.Cleanup(func() {
+					// lint
+					_ = root.Close()
+				})
+
+				return root, "/tmp/src", "../escape"
+			},
+
+			want: ErrPathLocal,
+		},
+
+		"src-missing": {
+			fn: func(t *testing.T) (*os.Root, string, string) {
+				input := filepath.Join(t.TempDir(), "missing")
+
+				root, err := os.OpenRoot(t.TempDir())
+				if err != nil {
+					t.Fatalf("open root err %v", err)
+				}
+
+				t.Cleanup(func() {
+					// lint
+					_ = root.Close()
+				})
+
+				return root, input, "dst"
+			},
+
+			want: ErrFileOpen,
+		},
+
+		"src-parent-missing": {
+			fn: func(t *testing.T) (*os.Root, string, string) {
+				input := filepath.Join(t.TempDir(), "missing", "src")
+
+				root, err := os.OpenRoot(t.TempDir())
+				if err != nil {
+					t.Fatalf("open root err %v", err)
+				}
+
+				t.Cleanup(func() {
+					// lint
+					_ = root.Close()
+				})
+
+				return root, input, "dst"
+			},
+
+			want: ErrFileOpen,
+		},
+
+		"src-dir": {
+			fn: func(t *testing.T) (*os.Root, string, string) {
+				var (
+					tmp = t.TempDir()
+					src = filepath.Join(tmp, "src")
+				)
+
+				if err := os.Mkdir(src, 0700); err != nil {
+					t.Fatalf("mkdir err %v", err)
+				}
+
+				root, err := os.OpenRoot(t.TempDir())
+				if err != nil {
+					t.Fatalf("open root err %v", err)
+				}
+
+				t.Cleanup(func() {
+					// lint
+					_ = root.Close()
+				})
+
+				return root, src, "dst"
+			},
+
+			want: ErrIsNotReg,
+		},
+
+		"src-sym": {
+			fn: func(t *testing.T) (*os.Root, string, string) {
+				var (
+					tmp    = t.TempDir()
+					target = filepath.Join(tmp, "target")
+					src    = filepath.Join(tmp, "src")
+				)
+
+				if err := os.WriteFile(target, []byte(t.Name()), 0600); err != nil {
+					t.Fatalf("file write err %v", err)
+				}
+
+				if err := os.Symlink(target, src); err != nil {
+					t.Fatalf("symlink err %v", err)
+				}
+
+				root, err := os.OpenRoot(t.TempDir())
+				if err != nil {
+					t.Fatalf("open root err %v", err)
+				}
+
+				t.Cleanup(func() {
+					// lint
+					_ = root.Close()
+				})
+
+				return root, src, "dst"
+			},
+
+			want: ErrFileOpen,
+		},
+	}
+
+	for name, test := range tests {
+		t.Run(name, func(t *testing.T) {
+			root, src, dst := test.fn(t)
+
+			if got := MvToRoot(root, src, dst, nil); !errors.Is(got, test.want) {
+				t.Errorf("unexpected mv to root err %v, want %v", got, test.want)
+			}
+		})
+	}
+}
+
+func TestMvOpenDirErrs(t *testing.T) {
+	var (
+		tmp    = t.TempDir()
+		notDir = filepath.Join(tmp, "file")
+		src    = filepath.Join(notDir, "src")
+		dst    = filepath.Join(t.TempDir(), "dst")
+	)
+
+	if err := os.WriteFile(notDir, []byte(t.Name()), 0600); err != nil {
+		t.Fatalf("file write err %v", err)
+	}
+
+	if got := Mv(src, dst, nil); !errors.Is(got, ErrStat) {
+		t.Errorf("unexpected mv err %v, want %v", got, ErrStat)
 	}
 }

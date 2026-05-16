@@ -17,60 +17,170 @@ var client = &http.Client{
 }
 
 func TestPost(t *testing.T) {
-	svc := httptest.NewServer(http.HandlerFunc(func(_ http.ResponseWriter, _ *http.Request) {}))
+	var (
+		svc   = httptest.NewServer(http.HandlerFunc(func(_ http.ResponseWriter, _ *http.Request) {}))
+		input = bytes.NewReader([]byte(t.Name()))
+		got   = Post(client, nil, nil, svc.URL, input, 200)
+	)
+
 	defer svc.Close()
 
-	if err := Post(client, nil, nil, svc.URL, bytes.NewReader([]byte(t.Name())), 200); err != nil {
-		t.Errorf("post error: %s", err)
+	if got != nil {
+		t.Errorf("post error %s", got)
 	}
 }
 
 func TestPostRespCodes(t *testing.T) {
-	svc := httptest.NewServer(http.HandlerFunc(func(_ http.ResponseWriter, _ *http.Request) {}))
+	var (
+		svc   = httptest.NewServer(http.HandlerFunc(func(_ http.ResponseWriter, _ *http.Request) {}))
+		input = bytes.NewReader([]byte(t.Name()))
+		got   = Post(client, nil, nil, svc.URL, input, 404)
+		want  = ErrBadStatus
+	)
+
 	defer svc.Close()
 
-	if err := Post(client, nil, nil, svc.URL, bytes.NewReader([]byte(t.Name())), 404); !errors.Is(err, ErrBadStatus) {
-		t.Errorf("unexpected post resp code error: %v, want %v", err, ErrBadStatus)
+	if !errors.Is(got, want) {
+		t.Errorf("unexpected post resp code err %v, want %v", got, want)
 	}
 }
 
 func TestPostErrs(t *testing.T) {
-	if err := Post(client, nil, nil, "https://"+t.Name(), bytes.NewReader([]byte(t.Name())), 200); !errors.Is(err, ErrReqDo) {
-		t.Errorf("unexpected post error: %v, want %v", err, ErrReqDo)
+	var (
+		input = bytes.NewReader([]byte(t.Name()))
+		got   = Post(client, nil, nil, "https://"+t.Name(), input, 200)
+		want  = ErrReqDo
+	)
+
+	if !errors.Is(got, want) {
+		t.Errorf("unexpected post err %v, want %v", got, want)
 	}
 }
 
-func TestPostWithHeaders(t *testing.T) {
-	svc := httptest.NewServer(http.HandlerFunc(func(_ http.ResponseWriter, r *http.Request) {
-		if r.Header.Get("Content-Type") != "application/json" {
-			t.Errorf("unexpected header: %v, want %v", r.Header.Get("Content-Type"), "application/json")
-		}
-	}))
+func TestPostHeaders(t *testing.T) {
+	var (
+		hdrs    = http.Header{}
+		wantKey = "Content-Type"
+		wantVal = "application / json"
+
+		svc = httptest.NewServer(http.HandlerFunc(func(_ http.ResponseWriter, rdr *http.Request) {
+			if rdr.Header.Get(wantKey) != wantVal {
+				t.Errorf("unexpected header %v, want %v", rdr.Header.Get(wantKey), wantVal)
+			}
+		}))
+
+		input = bytes.NewReader([]byte(t.Name()))
+	)
+
 	defer svc.Close()
 
-	headers := http.Header{}
-	headers.Set("Content-Type", "application/json")
+	hdrs.Set(wantKey, wantVal)
 
-	if err := Post(client, headers, nil, svc.URL, bytes.NewReader([]byte(t.Name())), 200); err != nil {
-		t.Errorf("post error: %s", err)
+	if got := Post(client, hdrs, nil, svc.URL, input, 200); got != nil {
+		t.Errorf("post err %s", got)
 	}
 }
 
-func TestPostWithAuth(t *testing.T) {
-	svc := httptest.NewServer(http.HandlerFunc(func(_ http.ResponseWriter, r *http.Request) {
-		user, pass, ok := r.BasicAuth()
-		if !ok || user != "user" || pass != "pass" {
-			t.Errorf("unexpected auth: user=%v, pass=%v", user, pass)
+func TestPostAuth(t *testing.T) {
+	var (
+		svc = httptest.NewServer(http.HandlerFunc(func(_ http.ResponseWriter, rdr *http.Request) {
+			user, pass, ok := rdr.BasicAuth()
+
+			if !ok || user != "user" || pass != "pass" {
+				t.Errorf("unexpected auth user %v, pass %v", user, pass)
+			}
+		}))
+
+		htpasswd = &Passwd{
+			User: "user",
+			Pass: "pass",
 		}
-	}))
+
+		input = bytes.NewReader([]byte(t.Name()))
+	)
+
 	defer svc.Close()
 
-	htpasswd := &Passwd{
-		User: "user",
-		Pass: "pass",
+	if got := Post(client, nil, htpasswd, svc.URL, input, 200); got != nil {
+		t.Errorf("post err %s", got)
+	}
+}
+
+func TestClean(t *testing.T) {
+	tests := []struct {
+		name  string
+		input string
+		want  string
+	}{
+		{
+			name:  "none",
+			input: "https://example.com/path",
+			want:  "https://example.com/path",
+		},
+
+		{
+			name:  "user-only",
+			input: "https://user@example.com/path",
+			want:  "https://example.com/path",
+		},
+
+		{
+			name:  "user-pass",
+			input: "https://user:pass@example.com/path",
+			want:  "https://example.com/path",
+		},
+
+		{
+			name:  "query",
+			input: "https://user:pass@example.com/path?k=v",
+			want:  "https://example.com/path?k=v",
+		},
+
+		{
+			name:  "empty",
+			input: "",
+			want:  "",
+		},
+
+		{
+			name:  "invalid",
+			input: "://invalid",
+			want:  "",
+		},
 	}
 
-	if err := Post(client, nil, htpasswd, svc.URL, bytes.NewReader([]byte(t.Name())), 200); err != nil {
-		t.Errorf("post error: %s", err)
+	for _, test := range tests {
+		t.Run(test.name, func(t *testing.T) {
+			if got := Clean(test.input); got != test.want {
+				t.Errorf("unexpected clean result %v, want %v", got, test.want)
+			}
+		})
+	}
+}
+
+func TestPostUserAgent(t *testing.T) {
+	var (
+		hdrs    = http.Header{}
+		wantKey = "User-Agent"
+
+		svc = httptest.NewServer(http.HandlerFunc(func(_ http.ResponseWriter, rdr *http.Request) {
+			if got := rdr.Header.Get(wantKey); got != UA {
+				t.Errorf("unexpected user agent %v, want %v", got, UA)
+			}
+		}))
+
+		input = bytes.NewReader([]byte(t.Name()))
+	)
+
+	defer svc.Close()
+
+	if got := Post(client, nil, nil, svc.URL, input, 200); got != nil {
+		t.Errorf("post err %s", got)
+	}
+
+	hdrs.Set("Content-Type", "application/json")
+
+	if got := Post(client, hdrs, nil, svc.URL, input, 200); got != nil {
+		t.Errorf("post err %s", got)
 	}
 }

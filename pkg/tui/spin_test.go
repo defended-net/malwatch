@@ -11,34 +11,34 @@ import (
 func TestNewSpinner(t *testing.T) {
 	var (
 		interval = 100 * time.Millisecond
-		spinner  = NewSpinner(interval, t.Name())
+		input    = NewSpinner(interval, t.Name())
 	)
 
-	if spinner.msg != t.Name() {
-		t.Errorf("unexpected spinner msg: %v, want %v", spinner.msg, t.Name())
+	if input.msg != t.Name() {
+		t.Errorf("unexpected spinner msg %v, want %v", input.msg, t.Name())
 	}
 
-	if spinner.interval != interval {
-		t.Errorf("unexpected spinner interval: %v, want %v", spinner.interval, interval)
+	if input.interval != interval {
+		t.Errorf("unexpected spinner interval %v, want %v", input.interval, interval)
 	}
 }
 
 func TestStart(t *testing.T) {
-	spinner := NewSpinner(100*time.Millisecond, t.Name())
+	input := NewSpinner(100*time.Millisecond, t.Name())
 
 	go func(spinner *Spinner) {
 		spinner.Start()
-	}(spinner)
+	}(input)
 
 	time.Sleep(500 * time.Millisecond)
 
-	spinner.Stop()
+	input.Stop()
 }
 
 func TestStartNil(t *testing.T) {
 	defer func() {
 		if err := recover(); err != nil {
-			t.Fatalf("unexpected nil spinner start panic")
+			t.Fatalf("unexpected start panic")
 		}
 	}()
 
@@ -48,21 +48,21 @@ func TestStartNil(t *testing.T) {
 }
 
 func TestStop(t *testing.T) {
-	spinner := NewSpinner(100*time.Millisecond, t.Name())
+	input := NewSpinner(100*time.Millisecond, t.Name())
 
 	go func(spinner *Spinner) {
 		spinner.Start()
-	}(spinner)
+	}(input)
 
 	time.Sleep(500 * time.Millisecond)
 
-	spinner.Stop()
+	input.Stop()
 }
 
 func TestStopNil(t *testing.T) {
 	defer func() {
 		if err := recover(); err != nil {
-			t.Fatalf("unexpected panic during nil spinner stop")
+			t.Fatalf("unexpected stop panic")
 		}
 	}()
 

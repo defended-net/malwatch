@@ -6,6 +6,7 @@ package pagerduty
 import (
 	"errors"
 	"io/fs"
+	"os"
 
 	"github.com/defended-net/malwatch/pkg/fsys"
 )
@@ -27,8 +28,8 @@ func NewCfg(path string) *Cfg {
 }
 
 // Load reads the cfg from toml path.
-func (cfg *Cfg) Load() error {
-	if err := fsys.InstallTOML(cfg.path, cfg); !errors.Is(err, fs.ErrExist) {
+func (cfg *Cfg) Load(root *os.Root) error {
+	if err := fsys.InstallTOML(root, cfg.path, cfg); !errors.Is(err, fs.ErrExist) {
 		return err
 	}
 

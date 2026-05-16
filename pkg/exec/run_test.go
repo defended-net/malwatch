@@ -32,9 +32,11 @@ func TestRun(t *testing.T) {
 				err: nil,
 			},
 		},
+
 		{
 			name: "echo-multi",
 			bin:  "echo",
+
 			args: []string{
 				"mal",
 				"watch",
@@ -45,6 +47,7 @@ func TestRun(t *testing.T) {
 				err: nil,
 			},
 		},
+
 		{
 			name: "newline",
 			bin:  "echo",
@@ -54,6 +57,7 @@ func TestRun(t *testing.T) {
 				err: nil,
 			},
 		},
+
 		{
 			name: "empty-stdout",
 			bin:  "true",
@@ -62,9 +66,11 @@ func TestRun(t *testing.T) {
 				err: nil,
 			},
 		},
+
 		{
 			name: "quotes",
 			bin:  "sh",
+
 			args: []string{
 				"-c",
 				"echo 'spaced args'",
@@ -75,9 +81,11 @@ func TestRun(t *testing.T) {
 				err: nil,
 			},
 		},
+
 		{
 			name: "status-code",
 			bin:  "sh",
+
 			args: []string{
 				"-c",
 				"exit 0",
@@ -87,9 +95,11 @@ func TestRun(t *testing.T) {
 				err: nil,
 			},
 		},
+
 		{
 			name: "status-code-err",
 			bin:  "sh",
+
 			args: []string{
 				"-c",
 				"exit 1",
@@ -97,14 +107,17 @@ func TestRun(t *testing.T) {
 
 			want: &want{
 				err: ErrRun,
+
 				has: []string{
 					"exit status 1",
 				},
 			},
 		},
+
 		{
 			name: "metachars-bin",
 			bin:  "echo;",
+
 			args: []string{
 				"hello",
 			},
@@ -113,9 +126,11 @@ func TestRun(t *testing.T) {
 				err: ErrMetaChars,
 			},
 		},
+
 		{
 			name: "metachars-args",
 			bin:  "echo",
+
 			args: []string{
 				`insecure | args`,
 			},
@@ -124,12 +139,14 @@ func TestRun(t *testing.T) {
 				err: ErrMetaChars,
 			},
 		},
+
 		{
 			name: "not-found",
 			bin:  "not-found",
 
 			want: &want{
 				err: ErrRun,
+
 				has: []string{
 					"executable file not found",
 				},
@@ -139,29 +156,31 @@ func TestRun(t *testing.T) {
 
 	for _, test := range tests {
 		t.Run(test.name, func(t *testing.T) {
-			out, err := Run(test.bin, test.args...)
+			out, got := Run(test.bin, test.args...)
 
 			if test.want.err != nil {
-				if err == nil {
-					t.Fatalf("expected run error %v, got nil", test.want.err.Error())
+				if got == nil {
+					t.Fatalf("unexpected run success")
+
 					return
 				}
 
-				if !errors.Is(err, test.want.err) {
-					t.Fatalf("unexpected run error %T %v, got %v", err, err, test.want.err)
+				if !errors.Is(got, test.want.err) {
+					t.Fatalf("unexpected run err %v, got %v", got, test.want.err)
 				}
 
 				for _, substr := range test.want.has {
-					if !strings.Contains(err.Error(), substr) {
-						t.Fatalf("missing substring for run error %v %v", err.Error(), substr)
+					if !strings.Contains(got.Error(), substr) {
+						t.Fatalf("missing substring err %v %v", got.Error(), substr)
 					}
 				}
 
 				return
 			}
 
-			if err != nil {
-				t.Fatalf("run error: %v", err)
+			if got != nil {
+				t.Fatalf("run err %v", got)
+
 				return
 			}
 

@@ -19,27 +19,31 @@ import (
 )
 
 func TestDo(t *testing.T) {
+	path := filepath.Join(t.TempDir(), t.Name())
+
 	env, err := env.Mock(t.Name(), t.TempDir())
 	if err != nil {
-		t.Errorf("env mock error: %v", err)
+		t.Errorf("env mock err %v", err)
 	}
 
 	if err := db.Load(env); err != nil {
-		t.Fatalf("db load error: %s", err)
+		t.Fatalf("db load err %s", err)
 	}
-
-	path := filepath.Join(t.TempDir(), t.Name())
 
 	file, err := os.Create(path)
 	if err != nil {
-		t.Fatal("file create error:", err)
+		t.Fatal("file create err", err)
 	}
-	defer file.Close()
+
+	defer func() {
+		// lint
+		_ = file.Close()
+	}()
 
 	env.Plat = plat.Mock(acter.Mock(act.VerbExile, true))
 
-	if err := Do(env, []string{path}); err != nil {
-		t.Errorf("exile error: %v", err)
+	if got := Do(env, []string{path}); got != nil {
+		t.Errorf("exile err %v", got)
 	}
 }
 
@@ -93,13 +97,13 @@ func TestDoInvalidPath(t *testing.T) {
 		t.Run(name, func(t *testing.T) {
 			env, err := env.Mock(t.Name(), t.TempDir())
 			if err != nil {
-				t.Errorf("env mock error: %v", err)
+				t.Errorf("env mock err %v", err)
 			}
 
 			env.Cfg.Acts.Quarantine.Dir = t.TempDir()
 
-			if err := Do(env, test.input); !errors.Is(err, test.want) {
-				t.Errorf("unexpected exile result %v, want %v", err, test.want)
+			if got := Do(env, test.input); !errors.Is(got, test.want) {
+				t.Errorf("unexpected do result %v, want %v", got, test.want)
 			}
 		})
 	}
@@ -113,10 +117,10 @@ func TestDoErrs(t *testing.T) {
 
 	env, err := env.Mock(t.Name(), t.TempDir())
 	if err != nil {
-		t.Errorf("env mock error: %v", err)
+		t.Errorf("env mock err %v", err)
 	}
 
-	if err := Do(env, input); !errors.Is(err, want) {
-		t.Errorf("unexpected quarantine err %v, want %v", err, want)
+	if got := Do(env, input); !errors.Is(got, want) {
+		t.Errorf("unexpected do err %v, want %v", got, want)
 	}
 }

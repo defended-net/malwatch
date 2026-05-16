@@ -53,8 +53,8 @@ func New(paths *path.Paths) *Cfg {
 }
 
 // Load reads the cfg from toml path.
-func (cfg *Cfg) Load() error {
-	if err := fsys.ReadTOML(cfg.Path(), cfg); err != nil {
+func (cfg *Cfg) Load(root *os.Root) error {
+	if err := fsys.ReadTOML(root, cfg.Path(), cfg); err != nil {
 		return err
 	}
 

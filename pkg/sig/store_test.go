@@ -25,7 +25,7 @@ func rss() (int64, error) {
 
 	parts := strings.Fields(string(statm))
 	if len(parts) < 2 {
-		return 0, fmt.Errorf("invalid statm format: %v", string(statm))
+		return 0, fmt.Errorf("invalid statm format %v", string(statm))
 	}
 
 	pages, err := strconv.ParseInt(parts[1], 10, 64)
@@ -39,26 +39,26 @@ func rss() (int64, error) {
 func TestSetLeak(t *testing.T) {
 	env, err := env.Mock(t.Name(), t.TempDir())
 	if err != nil {
-		t.Fatalf("env mock error: %v", err)
+		t.Fatalf("env mock err %v", err)
 	}
 
 	if err := Mock(env, true); err != nil {
-		t.Fatalf("sig mock error: %v", err)
+		t.Fatalf("sig mock err %v", err)
 	}
 
 	before, err := rss()
 	if err != nil {
-		t.Fatalf("rss error: %v", err)
+		t.Fatalf("rss err %v", err)
 	}
 
 	for idx := range 1000 {
 		if err := Set(env.Paths.Sigs.Yrc, uint64(idx)); err != nil {
-			t.Fatalf("set error:  %v", err)
+			t.Fatalf("set err  %v", err)
 		}
 
 		sigs, err := Acquire()
 		if err != nil {
-			t.Fatalf("acquire error:  %v", err)
+			t.Fatalf("acquire err  %v", err)
 		}
 
 		sigs.Release()
@@ -69,7 +69,7 @@ func TestSetLeak(t *testing.T) {
 
 	after, err := rss()
 	if err != nil {
-		t.Fatalf("rss error: %v", err)
+		t.Fatalf("rss err %v", err)
 	}
 
 	// 4MiB cushion for alloc noise.
@@ -81,23 +81,23 @@ func TestSetLeak(t *testing.T) {
 func TestSetLeakConcurrent(t *testing.T) {
 	env, err := env.Mock(t.Name(), t.TempDir())
 	if err != nil {
-		t.Fatalf("env mock error: %v", err)
+		t.Fatalf("env mock err %v", err)
 	}
 
 	if err := Mock(env, true); err != nil {
-		t.Fatalf("sig mock error: %v", err)
+		t.Fatalf("sig mock err %v", err)
 	}
 
 	before, err := rss()
 	if err != nil {
-		t.Fatalf("rss error: %v", err)
+		t.Fatalf("rss err %v", err)
 	}
 
 	var wg sync.WaitGroup
 
 	for idx := range 100 {
 		if err := Set(env.Paths.Sigs.Yrc, uint64(idx)); err != nil {
-			t.Fatalf("set error: %v", err)
+			t.Fatalf("set err %v", err)
 		}
 
 		for range 500 {
@@ -124,11 +124,25 @@ func TestSetLeakConcurrent(t *testing.T) {
 
 	after, err := rss()
 	if err != nil {
-		t.Fatalf("rss error: %v", err)
+		t.Fatalf("rss err %v", err)
 	}
 
 	// 4MiB cushion for alloc noise.
 	if got := after - before; got > 4096 {
 		t.Errorf("rss grew by %d kib", got)
+	}
+}
+
+func TestAcquireNil(t *testing.T) {
+	curr.Store(nil)
+
+	if _, got := Acquire(); got == nil {
+		t.Errorf("unexpected acquire success")
+	}
+}
+
+func TestSetErr(t *testing.T) {
+	if got := Set("/dev/null/not-exist", 0); got == nil {
+		t.Errorf("unexpected set success")
 	}
 }

@@ -3,6 +3,8 @@
 
 package path
 
+import "os"
+
 // Paths represents paths.
 type Paths struct {
 	Install *Install
@@ -20,6 +22,7 @@ type Install struct {
 	Tmp  string
 	Db   string
 	Log  string
+	Root *os.Root
 }
 
 // Cfg represents cfg paths.
@@ -32,11 +35,12 @@ type Cfg struct {
 
 // Sigs represents sig paths.
 type Sigs struct {
-	Dir string
-	Src string
-	Idx string
-	Yrc string
-	Tmp string
+	Dir  string
+	Src  string
+	Idx  string
+	Yrc  string
+	Tmp  string
+	Root *os.Root
 }
 
 // Plat represents plat cfg paths.

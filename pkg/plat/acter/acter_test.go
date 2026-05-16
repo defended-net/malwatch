@@ -18,14 +18,15 @@ func TestLoad(t *testing.T) {
 			Mock(t.Name()+"-disabled", false),
 		}
 
+		got, err = Load(nil, input)
+
 		want = []Acter{
 			input[0],
 		}
 	)
 
-	got, err := Load(input)
 	if err != nil {
-		t.Fatalf("load error: %s", err)
+		t.Fatalf("load err %s", err)
 	}
 
 	if !reflect.DeepEqual(got, want) {
@@ -35,13 +36,13 @@ func TestLoad(t *testing.T) {
 
 func TestGet(t *testing.T) {
 	var (
-		input = t.Name()
-		want  = Mock(t.Name(), true)
+		input    = t.Name()
+		want     = Mock(t.Name(), true)
+		got, err = Get([]Acter{want}, input)
 	)
 
-	got, err := Get([]Acter{want}, input)
 	if err != nil {
-		t.Fatalf("get error: %s", err)
+		t.Fatalf("get err %s", err)
 	}
 
 	if !reflect.DeepEqual(got, want) {
@@ -50,26 +51,35 @@ func TestGet(t *testing.T) {
 }
 
 func TestGetNoActer(t *testing.T) {
-	if _, got := Get([]Acter{}, t.Name()); !errors.Is(got, ErrVerbUnknown) {
-		t.Errorf("unexpected get no acter result %v, want %v", got, ErrVerbUnknown)
+	want := ErrVerbUnknown
+
+	if _, got := Get([]Acter{}, t.Name()); !errors.Is(got, want) {
+		t.Errorf("unexpected get result %v, want %v", got, want)
 	}
 }
 
 func TestDo(t *testing.T) {
-	input := []Acter{Mock(t.Name(), true)}
+	var (
+		input = []Acter{
+			Mock(t.Name(), true),
+		}
 
-	if err := Do(input, t.Name(), state.NewResult("fs", state.Paths{})); err != nil {
-		t.Errorf("do error: %s", err)
+		result = state.NewResult("fs", state.Paths{})
+	)
+
+	if got := Do(input, t.Name(), result); got != nil {
+		t.Errorf("do err %s", got)
 	}
 }
 
 func TestDoNoActer(t *testing.T) {
 	var (
-		input = []Acter{Mock(t.Name(), true)}
-		want  = ErrVerbUnknown
+		input  = []Acter{Mock(t.Name(), true)}
+		result = state.NewResult("fs", state.Paths{})
+		want   = ErrVerbUnknown
 	)
 
-	if got := Do(input, "not-exist", state.NewResult("fs", state.Paths{})); !errors.Is(got, want) {
+	if got := Do(input, "not-exist", result); !errors.Is(got, want) {
 		t.Errorf("unexpected do err %v, want %v", got, want)
 	}
 }

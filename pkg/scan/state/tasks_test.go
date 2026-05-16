@@ -50,8 +50,8 @@ func TestPrint(t *testing.T) {
 
 	for name, test := range tests {
 		t.Run(name, func(t *testing.T) {
-			if err := test.input.Print(); err != nil {
-				t.Errorf("print error: %v", err)
+			if got := test.input.Print(); got != nil {
+				t.Errorf("print err %v", got)
 			}
 		})
 	}
@@ -99,11 +99,11 @@ func TestSave(t *testing.T) {
 		t.Run(name, func(t *testing.T) {
 			db, err := orm.Mock(filepath.Join(t.TempDir(), t.Name()))
 			if err != nil {
-				t.Fatalf("db mock error: %v", err)
+				t.Fatalf("db mock err %v", err)
 			}
 
-			if err := test.input.Save(db); err != nil {
-				t.Errorf("db save error: %v", err)
+			if got := test.input.Save(db); got != nil {
+				t.Errorf("db save err %v", got)
 			}
 		})
 	}
