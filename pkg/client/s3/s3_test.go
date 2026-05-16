@@ -28,6 +28,10 @@ func TestNew(t *testing.T) {
 		t.Fatalf("secrets mock err %s", err)
 	}
 
+	if mock.S3.Endpoint == "" {
+		t.Skip("s3 secret not stored")
+	}
+
 	if _, got := New(mock.S3); got != nil {
 		t.Errorf("transport create err %s", got)
 	}
@@ -112,6 +116,10 @@ func TestUlErrs(t *testing.T) {
 	mock, err := secret.Mock(filepath.Join(t.TempDir(), t.Name()))
 	if err != nil {
 		t.Fatalf("secrets mock err %s", err)
+	}
+
+	if mock.S3.Endpoint == "" {
+		t.Skip("s3 secret not stored")
 	}
 
 	transport, err := New(mock.S3)
@@ -211,6 +219,10 @@ func TestDlErrs(t *testing.T) {
 	mock, err := secret.Mock(filepath.Join(t.TempDir(), t.Name()))
 	if err != nil {
 		t.Fatalf("secrets mock err %s", err)
+	}
+
+	if mock.S3.Endpoint == "" {
+		t.Skip("s3 secret not stored")
 	}
 
 	transport, err := New(mock.S3)

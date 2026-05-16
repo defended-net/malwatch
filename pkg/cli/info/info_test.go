@@ -23,6 +23,10 @@ func TestDo(t *testing.T) {
 
 	env.Plat = preset.New(env)
 
+	if env.Cfg.Secrets.S3.Endpoint == "" {
+		t.Skip("s3 secret not stored")
+	}
+
 	if err := env.Plat.Load(env.Paths.Install.Root); err != nil {
 		t.Error("preset load err ", err)
 	}

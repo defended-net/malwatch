@@ -16,6 +16,10 @@ func TestLoad(t *testing.T) {
 		t.Fatalf("env mock err %v", err)
 	}
 
+	if env.Cfg.Secrets.S3.Endpoint == "" {
+		t.Skip("s3 secret not stored")
+	}
+
 	env.Cfg.Acts.Quarantine.Dir = ""
 
 	if got := Load(env); got != nil {
@@ -27,6 +31,10 @@ func TestLoadCpanel(t *testing.T) {
 	env, err := env.Mock(t.Name(), t.TempDir())
 	if err != nil {
 		t.Fatalf("env mock err %v", err)
+	}
+
+	if env.Cfg.Secrets.S3.Endpoint == "" {
+		t.Skip("s3 secret not stored")
 	}
 
 	var (

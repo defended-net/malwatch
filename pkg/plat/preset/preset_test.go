@@ -27,6 +27,10 @@ func TestLoad(t *testing.T) {
 		t.Fatalf("env mock err %v", err)
 	}
 
+	if env.Cfg.Secrets.S3.Endpoint == "" {
+		t.Skip("s3 secret not stored")
+	}
+
 	env.Cfg.Acts.Quarantine.Dir = ""
 
 	env.Plat = New(env)
