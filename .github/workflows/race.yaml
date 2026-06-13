@@ -1,4 +1,4 @@
-name: tests
+name: race
 
 on: [push, pull_request]
 
@@ -7,10 +7,10 @@ concurrency:
   cancel-in-progress: true
 
 jobs:
-  test:
-    name: tests
+  race:
+    name: race
     runs-on: ubuntu-latest
-    timeout-minutes: 5
+    timeout-minutes: 10
     permissions:
       contents: read
 
@@ -25,7 +25,7 @@ jobs:
           check-latest: true
           cache: true
 
-      - name: tests
+      - name: tests with race detector
         env:
           JSON_USER: ${{ secrets.JSON_USER }}
           JSON_PASS: ${{ secrets.JSON_PASS }}
@@ -49,4 +49,4 @@ jobs:
           GIT_0_URL: ${{ secrets.GIT_0_URL }}
         run: |
           pkgs=$(go list ./... | grep -v '/yr' || true)
-          [ -n "$pkgs" ] && go test $pkgs
+          [ -n "$pkgs" ] && go test -race $pkgs

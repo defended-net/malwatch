@@ -1,4 +1,4 @@
-name: vulns
+name: sec
 
 on: [push, pull_request]
 
@@ -10,11 +10,13 @@ concurrency:
   cancel-in-progress: true
 
 jobs:
-  govulncheck:
+  gosec:
+    name: gosec
     runs-on: ubuntu-latest
     timeout-minutes: 5
     permissions:
       contents: read
+
     steps:
       - name: checkout
         uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683 # v4.2.2
@@ -26,5 +28,7 @@ jobs:
           check-latest: true
           cache: true
 
-      - name: govulncheck
-        uses: golang/govulncheck-action@b625fbe08f3bccbe446d94fbf87fcc875a4f50ee # v1.0.4
+      - name: gosec
+        uses: securego/gosec@4a3bd8af174872c778439083ded7adbf3747e770 # v2.26.1
+        with:
+          args: -exclude-dir=third_party ./...
