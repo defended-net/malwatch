@@ -4,6 +4,7 @@
 package base
 
 import (
+	"errors"
 	"os"
 	"path/filepath"
 	"testing"
@@ -119,6 +120,26 @@ func TestIdentifier(t *testing.T) {
 
 	if input.Identifier != hostname {
 		t.Errorf("unexpected identifier result %v, want %v", input.Identifier, hostname)
+	}
+}
+
+func TestValidateErr(t *testing.T) {
+	var (
+		input = &Cfg{
+			Identifier: "test",
+
+			Scans: &scan.Cfg{
+				Targets: []string{
+					`[`,
+				},
+			},
+		}
+
+		want = ErrReTarget
+	)
+
+	if got := input.Validate(); !errors.Is(got, want) {
+		t.Errorf("unexpected validate err %v, want %v", got, want)
 	}
 }
 

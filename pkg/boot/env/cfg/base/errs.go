@@ -8,4 +8,7 @@ import "errors"
 var (
 	// ErrHostnameLookup means hostname lookup error.
 	ErrHostnameLookup = errors.New("base: hostname lookup error")
+
+	// ErrReTarget means scan target regex compile error.
+	ErrReTarget = errors.New("base: scan target regex compile error")
 )
