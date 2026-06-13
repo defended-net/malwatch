@@ -20,6 +20,7 @@ func Run(bin string, args ...string) (string, error) {
 	}
 
 	var (
+		// #nosec G204 -- bin and args validated above.
 		cmd    = exec.Command(bin, args...)
 		stdout = &strings.Builder{}
 		stderr = &strings.Builder{}
