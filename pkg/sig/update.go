@@ -172,7 +172,7 @@ func (update *update) install(_ *secret.Repo) error {
 				return fmt.Errorf("%w, %v", fsys.ErrPathTraverse, dst)
 			}
 
-			if err := fsys.MvAt(update.paths.Root, src, dst, attr); err != nil {
+			if err := fsys.MvToRoot(update.paths.Root, src, dst, attr); err != nil {
 				return fmt.Errorf("%w, %v, %v", fsys.ErrFileCopy, err, dst)
 			}
 		}
