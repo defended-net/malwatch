@@ -29,7 +29,7 @@ type Sender struct {
 
 // Alert represents an alert.
 type Alert struct {
-	Payload []byte `json:"payload"`
+	Payload json.RawMessage `json:"payload"`
 }
 
 // statuses stores successful http resp codes.
@@ -75,12 +75,7 @@ func (sender *Sender) Load(root *os.Root) error {
 func (sender *Sender) Alert(result *state.Result) error {
 	slog.Info("sending alert", "transport", "json")
 
-	alert, err := sender.NewAlert(result)
-	if err != nil {
-		return err
-	}
-
-	payload, err := json.Marshal(alert)
+	payload, err := sender.NewAlert(result)
 	if err != nil {
 		return err
 	}
