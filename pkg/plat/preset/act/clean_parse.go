@@ -68,20 +68,21 @@ func isSafeExpr(expr string) error {
 	return nil
 }
 
-// skipDelim discards until unescaped delimit.
-func skipDelim(rdr *bufio.Reader, delimit rune) error {
+// skipDelim discards until unescaped delim.
+func skipDelim(rdr *bufio.Reader, delim rune) error {
 	var prev rune
+
 	for {
 		ch, _, err := rdr.ReadRune()
-		if err != nil {
-			return fmt.Errorf("%w, %c", ErrCleanDelimInvalid, delimit)
-		}
 
-		if ch == '\n' {
-			return fmt.Errorf("%w, %c", ErrCleanDelimInvalid, delimit)
-		}
+		switch {
+		case err != nil:
+			return fmt.Errorf("%w, %c", ErrCleanDelimInvalid, delim)
 
-		if ch == delimit && prev != '\\' {
+		case ch == '\n':
+			return fmt.Errorf("%w, %c", ErrCleanDelimInvalid, delim)
+
+		case ch == delim && prev != '\\':
 			return nil
 		}
 

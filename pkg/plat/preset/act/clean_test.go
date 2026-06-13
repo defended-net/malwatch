@@ -22,6 +22,7 @@ import (
 	"github.com/defended-net/malwatch/pkg/plat/acter"
 	"github.com/defended-net/malwatch/pkg/scan/state"
 	"github.com/defended-net/malwatch/pkg/sig"
+	"github.com/defended-net/malwatch/third_party/yr"
 )
 
 var (
@@ -52,7 +53,6 @@ func TestNewCleaner(t *testing.T) {
 			dir:   env.Cfg.Acts.Quarantine.Dir,
 			blkSz: got.blkSz,
 			expr:  env.Cfg.Acts.Clean,
-			rules: env.Paths.Sigs.Yrc,
 		}
 	)
 
@@ -72,8 +72,7 @@ func TestCleanLoad(t *testing.T) {
 	}
 
 	input := &Cleaner{
-		dir:   t.TempDir(),
-		rules: env.Paths.Sigs.Yrc,
+		dir: t.TempDir(),
 	}
 
 	if err := input.Load(nil); err != nil {
@@ -162,6 +161,79 @@ eval(gzinflate(base64_decode('test')));
 	}
 }
 
+func TestCleanInjMultiRule(t *testing.T) {
+	env, err := env.Mock(t.Name(), t.TempDir())
+	if err != nil {
+		t.Fatalf("env mock err %s", err)
+	}
+
+	if err := sig.Mock(env, true); err != nil {
+		t.Fatalf("sig mock err %v", err)
+	}
+
+	var (
+		acter = NewCleaner(env)
+		path  = filepath.Join(t.TempDir(), t.Name())
+
+		malware = []byte(`<?php echo "hello world";
+eval(base64_decode("mal"));
+echo "foo";
+eval(gzinflate(base64_decode('test')));
+?>`)
+
+		stat = &unix.Stat_t{}
+	)
+
+	if err := os.WriteFile(path, []byte(malware), 0600); err != nil {
+		t.Fatalf("file write err %v", err)
+	}
+
+	if err := acter.Load(nil); err != nil {
+		t.Fatalf("acter load err %s", err)
+	}
+
+	acter.expr = act.Clean{
+		"b64": reB64,
+		"gz":  reGz,
+	}
+
+	if err := unix.Stat(path, stat); err != nil {
+		t.Fatalf("stat err %v", err)
+	}
+
+	input := state.NewResult(
+		"",
+
+		state.Paths{
+			path: hit.NewMeta(
+				fsys.NewAttr(stat),
+
+				[]string{
+					"b64",
+					"gz",
+				},
+
+				"clean",
+			),
+		},
+	)
+
+	if got := acter.Act(input); got != nil {
+		t.Errorf("act err %v", got)
+	}
+
+	got, err := os.ReadFile(path)
+	if err != nil {
+		t.Fatalf("read cleaned file err %v", err)
+	}
+
+	for _, bad := range []string{"base64_decode", "gzinflate"} {
+		if strings.Contains(string(got), bad) {
+			t.Errorf("cleaned file still contains %q, %s", bad, got)
+		}
+	}
+}
+
 func TestCleanInjMultiLine(t *testing.T) {
 	env, err := env.Mock(t.Name(), t.TempDir())
 	if err != nil {
@@ -174,8 +246,7 @@ func TestCleanInjMultiLine(t *testing.T) {
 
 	var (
 		input = &Cleaner{
-			dir:   t.TempDir(),
-			rules: env.Paths.Sigs.Yrc,
+			dir: t.TempDir(),
 
 			blkSz: 32768,
 
@@ -205,6 +276,20 @@ eval(base64_decode("ware"));
 		t.Fatalf("file write err %s", err)
 	}
 
+	sigs, err := sig.Acquire()
+	if err != nil {
+		t.Fatalf("sig acquire err %v", err)
+	}
+	defer sigs.Release()
+
+	scanner, err := yr.NewScanner(sigs.Rules)
+	if err != nil {
+		t.Fatalf("scanner create err %v", err)
+	}
+	defer scanner.Destroy()
+
+	scanner.SetFlags(yr.ScanFlagsFastMode)
+
 	if got := input.clean(path, &hit.Meta{
 		Rules: []string{"php_base64_inject"},
 
@@ -213,7 +298,7 @@ eval(base64_decode("ware"));
 			GID:  os.Getgid(),
 			Mode: 0600,
 		},
-	}); got != nil {
+	}, scanner); got != nil {
 		t.Errorf("clean err %s", got)
 	}
 }
