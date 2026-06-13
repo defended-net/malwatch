@@ -11,7 +11,7 @@ require (
 	github.com/rwtodd/Go.Sed v0.0.0-20190103233418-906bc69c9394
 	github.com/wneessen/go-mail v0.7.2
 	go.etcd.io/bbolt v1.4.3
-	golang.org/x/sys v0.43.0
+	golang.org/x/sys v0.45.0
 )
 
 require (
@@ -46,8 +46,8 @@ require (
 	github.com/xanzy/ssh-agent v0.3.3 // indirect
 	github.com/zeebo/xxh3 v1.1.0 // indirect
 	go.yaml.in/yaml/v3 v3.0.4 // indirect
-	golang.org/x/crypto v0.50.0 // indirect
-	golang.org/x/net v0.53.0 // indirect
-	golang.org/x/text v0.36.0 // indirect
+	golang.org/x/crypto v0.52.0 // indirect
+	golang.org/x/net v0.54.0 // indirect
+	golang.org/x/text v0.37.0 // indirect
 	gopkg.in/warnings.v0 v0.1.2 // indirect
 )
