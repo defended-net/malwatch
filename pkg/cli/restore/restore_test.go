@@ -125,6 +125,10 @@ func TestDoS3(t *testing.T) {
 		t.Skip("s3 secret not stored")
 	}
 
+	if env.Cfg.Secrets.S3.Endpoint == "" {
+		t.Skip("s3 secret not stored")
+	}
+
 	if err := db.Load(env); err != nil {
 		t.Fatalf("db load err %v", err)
 	}
