@@ -27,15 +27,19 @@ import (
 // blkSz unit is byte.
 type Worker struct {
 	scanner atomic.Pointer[state.Scanner]
-	matches yr.MatchRules
+	matches matches
 	acts    *act.Cfg
 	buff    []byte
 	exp     time.Time
 	expFn   func(time.Time, int) (bool, *unix.Stat_t)
 }
 
+// matches represents matched rules.
+type matches []string
+
 // New returns a worker from given cfg, rules and max file age.
 func New(cfg *base.Cfg) (*Worker, error) {
+	// #nosec G404 -- non crypto jitter.
 	blkSz := int(float64(cfg.Scans.BlkSz) * (0.8 + rand.Float64()*0.2))
 
 	worker := &Worker{
@@ -60,12 +64,18 @@ func New(cfg *base.Cfg) (*Worker, error) {
 func (worker *Worker) Work(ctx context.Context, state *state.Job, queue <-chan string) {
 	defer state.WGrp.Done()
 
-	for path := range queue {
+	done := ctx.Done()
+
+	for {
 		select {
-		case <-ctx.Done():
+		case <-done:
 			return
 
-		default:
+		case path, ok := <-queue:
+			if !ok {
+				return
+			}
+
 			worker.Scan(path, state)
 		}
 	}
@@ -73,6 +83,8 @@ func (worker *Worker) Work(ctx context.Context, state *state.Job, queue <-chan s
 
 // Scan scans given file path and job state. Results and errs to job state.
 func (worker *Worker) Scan(path string, result *state.Job) {
+	worker.matches = worker.matches[:0]
+
 	fd, err := unix.Open(path, unix.O_RDONLY|unix.O_NOFOLLOW, 0)
 	if err != nil {
 		result.AddErr(fmt.Errorf("%w, %v, %v", ErrFileRead, err, path))
@@ -105,7 +117,12 @@ out:
 				return
 			}
 
-		case offset == 0:
+			// condemn
+			if len(worker.matches) > 3 {
+				break out
+			}
+
+		default:
 			break out
 		}
 	}
@@ -127,10 +144,8 @@ out:
 		}
 	}
 
-	matches := MatchesToStr(worker.matches)
-
-	// Reset per file.
-	worker.matches = worker.matches[:0]
+	matches := slices.Clone(worker.matches)
+	slices.Sort(matches)
 
 	result.Hits <- &state.Hit{
 		Path: path,
@@ -172,17 +187,17 @@ func (worker *Worker) Refresh() error {
 	return nil
 }
 
-// MatchesToStr returns a slice string from given yr.MatcheRules.
-func MatchesToStr(matches yr.MatchRules) []string {
-	rules := []string{}
+// RuleMatching implements yr.ScanCallback.
+func (matches *matches) RuleMatching(_ *yr.ScanContext, rule *yr.Rule) (bool, error) {
+	hit := rule.Identifier()
 
-	for _, rule := range matches {
-		rules = append(rules, rule.Rule)
+	if slices.Contains(*matches, hit) {
+		return false, nil
 	}
 
-	slices.Sort(rules)
+	*matches = append(*matches, hit)
 
-	return slices.Compact(rules)
+	return len(*matches) > 3, nil
 }
 
 func noop(_ time.Time, _ int) (bool, *unix.Stat_t) {
