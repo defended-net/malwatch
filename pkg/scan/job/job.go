@@ -61,13 +61,17 @@ func New(target string, paths *Paths, timeout time.Duration, batchSz int, acters
 }
 
 // Walk traverses paths for given job.
-func (job *Job) Walk(skips *act.Skips, sz int) <-chan string {
+func (job *Job) Walk(ctx context.Context, skips *act.Skips, sz int) <-chan string {
 	queue := make(chan string, sz)
 
-	go func() {
+	go func(done <-chan struct{}) {
 		defer close(queue)
 
 		for _, entry := range append(job.paths.Dirs, job.paths.Files...) {
+			if ctx.Err() != nil {
+				return
+			}
+
 			if err := filepath.WalkDir(entry, func(path string, info os.DirEntry, err error) error {
 				switch {
 				case err != nil:
@@ -85,22 +89,26 @@ func (job *Job) Walk(skips *act.Skips, sz int) <-chan string {
 					return nil
 				}
 
-				queue <- path
+				select {
+				case queue <- path:
+					return nil
 
-				return nil
+				case <-done:
+					return filepath.SkipAll
+				}
 			}); err != nil {
 				job.State.AddErr(fmt.Errorf("%v, %w", fsys.ErrWalk, err))
 			}
 		}
-	}()
+	}(ctx.Done())
 
 	return queue
 }
 
 // Start starts given job.
 func (job *Job) Start(ctx context.Context, skips *act.Skips, workers ...*worker.Worker) {
-	go job.spinner.Start()
-	queue := job.Walk(skips, job.batchSz)
+	job.spinner.Start()
+	queue := job.Walk(ctx, skips, job.batchSz)
 
 	for _, worker := range workers {
 		job.State.WGrp.Add(1)
@@ -118,7 +126,7 @@ func (job *Job) Start(ctx context.Context, skips *act.Skips, workers ...*worker.
 
 // Stop stops given job by flushing hits.
 func (job *Job) Stop() {
-	hits := make([]*state.Hit, 0, job.batchSz)
+	hits := []*state.Hit{}
 
 	for hit := range job.State.Hits {
 		hits = append(hits, hit)

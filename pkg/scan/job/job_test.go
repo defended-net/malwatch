@@ -139,7 +139,7 @@ func TestWalk(t *testing.T) {
 
 	job := New("target", input, 0, 1, []acter.Acter{}, nil, true)
 
-	job.Walk(&act.Skips{}, 1)
+	job.Walk(context.TODO(), &act.Skips{}, 1)
 }
 
 func TestNew(t *testing.T) {
