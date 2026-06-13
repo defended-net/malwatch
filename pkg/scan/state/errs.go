@@ -9,19 +9,16 @@ import (
 
 // Errs represents an error store.
 type Errs struct {
-	Mtx  sync.Mutex
+	mtx  sync.Mutex
 	Vals []error
 }
 
 // Get returns the store's errors. Store is then cleared.
 func (errs *Errs) Get() []error {
-	errs.Mtx.Lock()
-	defer errs.Mtx.Unlock()
+	errs.mtx.Lock()
+	defer errs.mtx.Unlock()
 
-	tmp := make([]error, len(errs.Vals))
-
-	copy(tmp, errs.Vals)
-
+	tmp := errs.Vals
 	errs.Vals = nil
 
 	return tmp
@@ -29,8 +26,8 @@ func (errs *Errs) Get() []error {
 
 // Add adds a given error. Same error is returned.
 func (errs *Errs) Add(err error) {
-	errs.Mtx.Lock()
-	defer errs.Mtx.Unlock()
+	errs.mtx.Lock()
+	defer errs.mtx.Unlock()
 
 	errs.Vals = append(errs.Vals, err)
 }
