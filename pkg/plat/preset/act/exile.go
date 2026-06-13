@@ -75,13 +75,16 @@ func (exiler *Exiler) Single(result *state.Result, path string, meta *hit.Meta) 
 		return
 	}
 
-	fd, _, err := fsys.Open(path)
+	parentFd, fd, name, _, err := fsys.OpenParent(path)
 	if err != nil {
 		result.AddErr(fmt.Errorf("%w, %v, %v", ErrExileDelErr, err, path))
 
 		return
 	}
 
+	defer fsys.CloseFd(parentFd)
+
+	// #nosec G115 -- os file desc.
 	file := os.NewFile(uintptr(fd), path)
 	defer fsys.Close(file)
 
@@ -99,7 +102,7 @@ func (exiler *Exiler) Single(result *state.Result, path string, meta *hit.Meta) 
 
 		return
 
-	case fsys.Unlink(path, false) != nil:
+	case fsys.UnlinkAt(parentFd, name) != nil:
 		result.AddErr(fmt.Errorf("%w, %v, %v", ErrExileDelErr, err, path))
 
 		return
