@@ -38,7 +38,7 @@ func TestOpen(t *testing.T) {
 func TestOpenErrs(t *testing.T) {
 	want := ErrPathTraverse
 
-	if _, _, got := Open("/../etc/passwd"); !errors.Is(got, want) {
+	if _, _, got := Open("/../etc/file"); !errors.Is(got, want) {
 		t.Errorf("unexpected file open err %v, want %v", got, want)
 	}
 }
@@ -130,7 +130,7 @@ func TestUnlink(t *testing.T) {
 			}
 
 			if _, got := os.Stat(input); !errors.Is(got, want) {
-				t.Errorf("stat err %v, want %v", got, want)
+				t.Errorf("unexpected stat err %v, want %v", got, want)
 			}
 		})
 	}
@@ -144,7 +144,7 @@ func TestUnlinkErrs(t *testing.T) {
 	}{
 		"dot-dots": {
 			fn: func(_ *testing.T) string {
-				return "/../etc/passwd"
+				return "/../etc/file"
 			},
 
 			dir:  false,
@@ -197,6 +197,123 @@ func TestUnlinkErrs(t *testing.T) {
 				t.Errorf("unexpected unlink err %v, want %v", got, test.want)
 			}
 		})
+	}
+}
+
+func TestOpenParent(t *testing.T) {
+	input := filepath.Join(t.TempDir(), t.Name())
+
+	if _, err := os.Create(input); err != nil {
+		t.Fatalf("file create err %v", err)
+	}
+
+	parent, fd, name, stat, got := OpenParent(input)
+	if got != nil {
+		t.Errorf("open parent err %v", got)
+	}
+
+	for _, fd := range []int{
+		parent,
+		fd,
+	} {
+		defer CloseFd(fd)
+	}
+
+	if name != filepath.Base(input) {
+		t.Errorf("unexpected name %v, want %v", name, filepath.Base(input))
+	}
+
+	if stat == nil {
+		t.Errorf("nil stat")
+	}
+}
+
+func TestOpenParentErrs(t *testing.T) {
+	tests := map[string]struct {
+		fn   func(t *testing.T) string
+		want error
+	}{
+		"dot-dots": {
+			fn: func(_ *testing.T) string {
+				return "/../etc/file"
+			},
+
+			want: ErrPathTraverse,
+		},
+
+		"not-exist": {
+			fn: func(t *testing.T) string {
+				return filepath.Join(t.TempDir(), "not-exist", "file")
+			},
+
+			want: ErrFileOpen,
+		},
+
+		"not-reg": {
+			fn: func(t *testing.T) string {
+				path := filepath.Join(t.TempDir(), "dir")
+
+				if err := os.Mkdir(path, 0700); err != nil {
+					t.Fatalf("mkdir err %v", err)
+				}
+
+				return path
+			},
+
+			want: ErrIsNotReg,
+		},
+	}
+
+	for name, test := range tests {
+		t.Run(name, func(t *testing.T) {
+			if _, _, _, _, got := OpenParent(test.fn(t)); !errors.Is(got, test.want) {
+				t.Errorf("unexpected open parent err %v, want %v", got, test.want)
+			}
+		})
+	}
+}
+
+func TestUnlinkAt(t *testing.T) {
+	input := filepath.Join(t.TempDir(), t.Name())
+
+	if _, err := os.Create(input); err != nil {
+		t.Fatalf("file create err %v", err)
+	}
+
+	parent, fd, name, _, err := OpenParent(input)
+	if err != nil {
+		t.Fatalf("open parent err %v", err)
+	}
+
+	for _, fd := range []int{
+		parent,
+		fd,
+	} {
+		defer CloseFd(fd)
+	}
+
+	if got := UnlinkAt(parent, name); got != nil {
+		t.Errorf("unlink err %v", got)
+	}
+
+	if _, got := os.Stat(input); !errors.Is(got, os.ErrNotExist) {
+		t.Errorf("unexpected stat err %v, want %v", got, os.ErrNotExist)
+	}
+}
+
+func TestUnlinkAtErrs(t *testing.T) {
+	var (
+		fd, err = openDir(t.TempDir())
+		want    = ErrFileDel
+	)
+
+	if err != nil {
+		t.Fatalf("open dir err %v", err)
+	}
+	defer CloseFd(fd)
+
+	if got := UnlinkAt(fd, "not-exist"); !errors.Is(got, want) {
+		t.Errorf("unexpected unlink err %v, want %v", got, want)
 	}
 }
 
@@ -322,7 +439,7 @@ func TestMv(t *testing.T) {
 			attr: attr,
 		},
 
-		"no-attr": {
+		"attr-missing": {
 			fn: func(t *testing.T) (string, string) {
 				input := filepath.Join(t.TempDir(), "src")
 
@@ -378,7 +495,7 @@ func TestMvErrs(t *testing.T) {
 
 		"dot-dots": {
 			fn: func(_ *testing.T) (string, string) {
-				return "/../etc/passwd", "/tmp/x"
+				return "/../etc/file", "/tmp/x"
 			},
 
 			want: ErrPathTraverse,
@@ -474,7 +591,7 @@ func TestMvAt(t *testing.T) {
 		_ = root.Close()
 	}()
 
-	if got := MvAt(root, src, dst, attr); got != nil {
+	if got := MvToRoot(root, src, dst, attr); got != nil {
 		t.Errorf("mv err %v", got)
 	}
 
@@ -487,7 +604,7 @@ func TestMvAt(t *testing.T) {
 	}
 }
 
-func TestMvAtSameTarget(t *testing.T) {
+func TestMvToRootSameTarget(t *testing.T) {
 	var (
 		tmp   = t.TempDir()
 		input = filepath.Join(tmp, "file")
@@ -507,17 +624,17 @@ func TestMvAtSameTarget(t *testing.T) {
 		_ = root.Close()
 	}()
 
-	if got := MvAt(root, input, input, nil); got != nil {
+	if got := MvToRoot(root, input, input, nil); got != nil {
 		t.Errorf("mv err %v", got)
 	}
 }
 
-func TestMvAtErrs(t *testing.T) {
+func TestMvRootErrs(t *testing.T) {
 	tests := map[string]struct {
 		fn   func(t *testing.T) (root *os.Root, src, dst string)
 		want error
 	}{
-		"nil-root": {
+		"nil": {
 			fn: func(_ *testing.T) (*os.Root, string, string) {
 				return nil, "src", "dst"
 			},
@@ -525,7 +642,7 @@ func TestMvAtErrs(t *testing.T) {
 			want: ErrPathRoot,
 		},
 
-		"not-local": {
+		"escape": {
 			fn: func(t *testing.T) (*os.Root, string, string) {
 				root, err := os.OpenRoot(t.TempDir())
 				if err != nil {
@@ -619,7 +736,7 @@ func TestMvAtErrs(t *testing.T) {
 		t.Run(name, func(t *testing.T) {
 			root, src, dst := test.fn(t)
 
-			if got := MvAt(root, src, dst, nil); !errors.Is(got, test.want) {
+			if got := MvToRoot(root, src, dst, nil); !errors.Is(got, test.want) {
 				t.Errorf("unexpected mv err %v, want %v", got, test.want)
 			}
 		})
@@ -683,7 +800,7 @@ func TestRootNameErrs(t *testing.T) {
 		fn   func(t *testing.T) (root *os.Root, path string)
 		want error
 	}{
-		"nil-root": {
+		"nil": {
 			fn: func(t *testing.T) (*os.Root, string) {
 				return nil, t.Name()
 			},
@@ -691,7 +808,7 @@ func TestRootNameErrs(t *testing.T) {
 			want: ErrPathRoot,
 		},
 
-		"not-local": {
+		"escape": {
 			fn: func(t *testing.T) (*os.Root, string) {
 				root, err := os.OpenRoot(t.TempDir())
 				if err != nil {
@@ -857,7 +974,7 @@ func TestQuarantinePath(t *testing.T) {
 				t.Errorf("empty quarantine path")
 
 			case !strings.HasPrefix(got, tmp):
-				t.Errorf("unexpected quarantine path %v, want prefix %v", got, tmp)
+				t.Errorf("unexpected quarantine path %v, want %v", got, tmp)
 			}
 		})
 	}
@@ -1071,11 +1188,7 @@ func TestIsExp(t *testing.T) {
 			if err != nil {
 				t.Fatalf("file open err %s", err)
 			}
-
-			defer func() {
-				// lint
-				_ = file.Close()
-			}()
+			defer Close(file)
 
 			if got, _ := IsExp(test.ttl(), int(file.Fd())); got != test.want {
 				t.Errorf("unexpected is exp result %v, want %v", got, test.want)
@@ -1157,7 +1270,7 @@ func TestMvToRootErrs(t *testing.T) {
 		fn   func(t *testing.T) (root *os.Root, src, dst string)
 		want error
 	}{
-		"nil-root": {
+		"nil": {
 			fn: func(_ *testing.T) (*os.Root, string, string) {
 				return nil, "/src", "/dst"
 			},
@@ -1177,13 +1290,13 @@ func TestMvToRootErrs(t *testing.T) {
 					_ = root.Close()
 				})
 
-				return root, "/../etc/passwd", "dst"
+				return root, "/../etc/file", "dst"
 			},
 
 			want: ErrPathTraverse,
 		},
 
-		"not-local": {
+		"escape": {
 			fn: func(t *testing.T) (*os.Root, string, string) {
 				root, err := os.OpenRoot(t.TempDir())
 				if err != nil {
