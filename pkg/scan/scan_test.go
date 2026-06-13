@@ -66,8 +66,8 @@ func TestNew(t *testing.T) {
 				t.Fatalf("create scan error %v", err)
 			}
 
-			if err := scan.Run(); err != nil {
-				t.Errorf("run scan error %v", err)
+			if err := scan.Do(); err != nil {
+				t.Errorf("do scan error %v", err)
 			}
 		})
 	}
