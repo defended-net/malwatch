@@ -260,13 +260,6 @@ func (cleaner *Cleaner) apply(src *os.File, dst *os.File, rules []string, engine
 	return nil
 }
 
-func (cleaner *Cleaner) release() {
-	if cleaner.root != nil {
-		cleaner.root.Close()
-		cleaner.root = nil
-	}
-}
-
 // Verb returns given cleaner verb.
 func (cleaner *Cleaner) Verb() string {
 	return cleaner.verb
