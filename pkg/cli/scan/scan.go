@@ -34,5 +34,5 @@ func Do(env *env.Env, args []string) error {
 		return err
 	}
 
-	return scan.Run()
+	return scan.Do()
 }

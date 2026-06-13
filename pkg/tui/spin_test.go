@@ -26,9 +26,7 @@ func TestNewSpinner(t *testing.T) {
 func TestStart(t *testing.T) {
 	input := NewSpinner(100*time.Millisecond, t.Name())
 
-	go func(spinner *Spinner) {
-		spinner.Start()
-	}(input)
+	input.Start()
 
 	time.Sleep(500 * time.Millisecond)
 
@@ -50,9 +48,7 @@ func TestStartNil(t *testing.T) {
 func TestStop(t *testing.T) {
 	input := NewSpinner(100*time.Millisecond, t.Name())
 
-	go func(spinner *Spinner) {
-		spinner.Start()
-	}(input)
+	input.Start()
 
 	time.Sleep(500 * time.Millisecond)
 

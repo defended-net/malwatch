@@ -232,8 +232,8 @@ func (meta *Meta) ToSlice(path string) []string {
 		strings.Join(meta.Rules, "\n"),
 		meta.Attr.MTime.Format(tzFmt),
 		meta.Attr.CTime.Format(tzFmt),
-		strconv.FormatUint(uint64(meta.Attr.UID), 10),
-		strconv.FormatUint(uint64(meta.Attr.GID), 10),
+		strconv.Itoa(meta.Attr.UID),
+		strconv.Itoa(meta.Attr.GID),
 		meta.Status,
 		strings.Join(meta.Acts, ","),
 	}

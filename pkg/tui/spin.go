@@ -34,26 +34,28 @@ func (spinner *Spinner) Start() {
 	}
 
 	spinner.running.Store(true)
-
 	spinner.done.Add(1)
-	defer spinner.done.Done()
 
-	var (
-		ticker = time.NewTicker(spinner.interval)
-		idx    = 0
-		tick   = []string{"-", "\\", "|", "/"}
-	)
+	go func() {
+		defer spinner.done.Done()
 
-	defer ticker.Stop()
+		var (
+			ticker = time.NewTicker(spinner.interval)
+			idx    = 0
+			tick   = []string{"-", "\\", "|", "/"}
+		)
 
-	for spinner.running.Load() {
-		<-ticker.C
+		defer ticker.Stop()
 
-		fmt.Printf("\r%v [%v]", spinner.msg, tick[idx])
-		idx = (idx + 1) % len(tick)
-	}
+		for spinner.running.Load() {
+			<-ticker.C
 
-	fmt.Printf("\r\033[2K")
+			fmt.Printf("\r%v [%v]", spinner.msg, tick[idx])
+			idx = (idx + 1) % len(tick)
+		}
+
+		fmt.Printf("\r\033[2K")
+	}()
 }
 
 // Stop stops a spinner.

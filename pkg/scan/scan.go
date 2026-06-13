@@ -78,28 +78,37 @@ func (scan *Scan) addJobs(env *env.Env, paths []string) {
 	}
 }
 
-// Run runs a scan.
-func (scan *Scan) Run() error {
+// Do does scan.
+func (scan *Scan) Do() error {
 	for _, job := range scan.jobs {
-		ctx, cancel := context.WithTimeout(context.Background(), scan.timeout)
-		scan.cancel.Add(cancel)
-
-		sigs, err := sig.Acquire()
-		if err != nil {
+		if err := scan.Start(job); err != nil {
 			return err
 		}
-		// workers hold own ref.
-		defer sigs.Release()
-
-		if scan.rev != sigs.Rev {
-			if err := scan.refresh(sigs.Rev); err != nil {
-				return err
-			}
-		}
-
-		job.Start(ctx, scan.skips, scan.workers...)
-		job.Stop()
 	}
+
+	return nil
+}
+
+// Start does given job,
+func (scan *Scan) Start(job *job.Job) error {
+	ctx, cancel := context.WithTimeout(context.Background(), scan.timeout)
+	scan.cancel.Add(cancel)
+
+	sigs, err := sig.Acquire()
+	if err != nil {
+		return err
+	}
+	// workers hold own ref.
+	defer sigs.Release()
+
+	if scan.rev != sigs.Rev {
+		if err := scan.refresh(sigs.Rev); err != nil {
+			return err
+		}
+	}
+
+	job.Start(ctx, scan.skips, scan.workers...)
+	job.Stop()
 
 	return nil
 }

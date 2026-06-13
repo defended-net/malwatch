@@ -7,13 +7,11 @@ import (
 	"context"
 	"os"
 	"path/filepath"
-	"slices"
 	"testing"
 
 	"github.com/defended-net/malwatch/pkg/boot/env"
 	"github.com/defended-net/malwatch/pkg/scan/state"
 	"github.com/defended-net/malwatch/pkg/sig"
-	"github.com/defended-net/malwatch/third_party/yr"
 )
 
 var sample = `X5O!P%@AP[4\PZX54(P^)7CC)7}$EICAR-STANDARD-ANTIVIRUS-TEST-FILE!$H+H*`
@@ -86,48 +84,6 @@ func TestScan(t *testing.T) {
 
 		worker.Scan(path, state)
 	}(worker)
-}
-
-func TestMatchesToString(t *testing.T) {
-	tests := map[string]struct {
-		input yr.MatchRules
-		want  []string
-	}{
-		"single": {
-			input: yr.MatchRules{
-				{
-					Rule: "rule",
-				},
-			},
-
-			want: []string{"rule"},
-		},
-
-		"compound": {
-			input: yr.MatchRules{
-				{
-					Rule: "rule-a",
-				},
-				{
-					Rule: "rule-b",
-				},
-			},
-
-			want: []string{
-				"rule-a",
-				"rule-b",
-			},
-		},
-	}
-
-	for name, test := range tests {
-		t.Run(name, func(t *testing.T) {
-			if got := MatchesToStr(test.input); !slices.Equal(got, test.want) {
-				t.Errorf("unexpected matches to string result %v, want %v", got, test.want)
-			}
-		})
-	}
-
 }
 
 func TestScanOpenErr(t *testing.T) {

@@ -20,12 +20,15 @@ func (hits *Hits) Get(clear bool) []*state.Hit {
 	hits.mtx.Lock()
 	defer hits.mtx.Unlock()
 
+	if clear {
+		tmp := hits.vals
+		hits.vals = nil
+
+		return tmp
+	}
+
 	tmp := make([]*state.Hit, len(hits.vals))
 	copy(tmp, hits.vals)
-
-	if clear {
-		hits.vals = nil
-	}
 
 	return tmp
 }

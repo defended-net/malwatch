@@ -10,5 +10,5 @@ var (
 	ErrNoScanPaths = errors.New("scan: no scan paths in cfg.toml")
 
 	// ErrPathGlob means glob error.
-	ErrPathGlob = errors.New("fsys: path glob error")
+	ErrPathGlob = errors.New("scan: path glob error")
 )

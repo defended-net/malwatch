@@ -42,6 +42,7 @@ func Submit(secrets *secret.Submit, path string) error {
 		return err
 	}
 
+	// #nosec G115 -- os file desc.
 	file := os.NewFile(uintptr(fd), path)
 	defer fsys.Close(file)
 
@@ -53,6 +54,7 @@ func Submit(secrets *secret.Submit, path string) error {
 		}
 	}()
 
+	// #nosec G107 -- direct user input.
 	return Post(
 		sess,
 		hdrs,

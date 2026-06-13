@@ -4,6 +4,7 @@
 package fsys
 
 import (
+	"errors"
 	"fmt"
 	"io"
 	"io/fs"
@@ -67,6 +68,7 @@ func OpenFile(path string, flags int) (int, *unix.Stat_t, error) {
 	defer CloseFd(parentFd)
 
 	fd, err := unix.Openat2(parentFd, name, &unix.OpenHow{
+		// #nosec G115 -- bitflag consts non neg.
 		Flags: uint64(
 			flags |
 				unix.O_CLOEXEC |
@@ -98,6 +100,74 @@ func OpenFile(path string, flags int) (int, *unix.Stat_t, error) {
 	keep = true
 
 	return fd, stat, nil
+}
+
+// OpenParent opens given path keeping parent dir fd open. Returns parentFd,
+// fd, name and stat. Caller responsible for closing fds.
+func OpenParent(path string) (int, int, string, *unix.Stat_t, error) {
+	if err := HasDotDots(path); err != nil {
+		return -1, -1, "", nil, err
+	}
+
+	var (
+		keep   bool
+		stat   = &unix.Stat_t{}
+		clean  = filepath.Clean(path)
+		parent = filepath.Dir(clean)
+		name   = filepath.Base(clean)
+	)
+
+	parentFd, err := openDir(parent)
+	if err != nil {
+		return -1, -1, "", nil, ErrFileOpen
+	}
+
+	defer func() {
+		if !keep {
+			CloseFd(parentFd)
+		}
+	}()
+
+	fd, err := unix.Openat2(parentFd, name, &unix.OpenHow{
+		Flags: uint64(
+			unix.O_RDONLY |
+				unix.O_CLOEXEC |
+				unix.O_NOFOLLOW |
+				unix.O_NONBLOCK,
+		),
+
+		Resolve: unix.RESOLVE_NO_SYMLINKS,
+	})
+	if err != nil {
+		return -1, -1, "", nil, ErrFileOpen
+	}
+
+	defer func() {
+		if !keep {
+			CloseFd(fd)
+		}
+	}()
+
+	if err := unix.Fstat(fd, stat); err != nil {
+		return -1, -1, "", nil, ErrStat
+	}
+
+	if stat.Mode&unix.S_IFMT != unix.S_IFREG {
+		return -1, -1, "", nil, ErrIsNotReg
+	}
+
+	keep = true
+
+	return parentFd, fd, name, stat, nil
+}
+
+// UnlinkAt unlinks given name rel to parentFd.
+func UnlinkAt(parentFd int, name string) error {
+	if err := unix.Unlinkat(parentFd, name, 0); err != nil {
+		return ErrFileDel
+	}
+
+	return nil
 }
 
 // Unlink unlinks given path.
@@ -281,18 +351,28 @@ func MntPoint(path string) (string, error) {
 	return "/", nil
 }
 
-// MvAt moves given src to given dst confined by given root.
-func MvAt(root *os.Root, src string, dst string, attr *Attr) error {
+// MvToRoot moves given src to given dst within given root. src may be outside root.
+func MvToRoot(root *os.Root, src string, dst string, attr *Attr) error {
 	if root == nil {
 		return ErrPathRoot
 	}
 
-	src, err := RootName(root, src)
-	if err != nil {
+	srcName, err := RootName(root, src)
+	switch {
+	case err == nil:
+		return mvWithinRoot(root, srcName, dst, attr)
+
+	case errors.Is(err, ErrPathLocal) && filepath.IsAbs(src):
+		return mvIntoRoot(root, src, dst, attr)
+
+	default:
 		return err
 	}
+}
 
-	dst, err = RootName(root, dst)
+// mvWithinRoot moves given src to given dst, both confined by given root.
+func mvWithinRoot(root *os.Root, src string, dst string, attr *Attr) error {
+	dst, err := RootName(root, dst)
 	if err != nil {
 		return err
 	}
@@ -368,7 +448,7 @@ func copyAt(root *os.Root, src string, dst string, attr *Attr) error {
 		return fmt.Errorf("%w, %v, %v", ErrFileSync, err, dst)
 	}
 
-	if err := applyAttrAt(root, dst, attr); err != nil {
+	if err := applyAttr(root, dst, attr); err != nil {
 		return err
 	}
 
@@ -377,8 +457,9 @@ func copyAt(root *os.Root, src string, dst string, attr *Attr) error {
 	return nil
 }
 
-// applyAttrAt applies attr to name within root. No-op when attr is nil.
-func applyAttrAt(root *os.Root, name string, attr *Attr) error {
+// applyAttr applies given attr to given name within given root.
+// Noop if nil attr.
+func applyAttr(root *os.Root, name string, attr *Attr) error {
 	if attr == nil {
 		return nil
 	}
@@ -394,9 +475,8 @@ func applyAttrAt(root *os.Root, name string, attr *Attr) error {
 	return nil
 }
 
-// MvToRoot moves given src to given dstRoot. src may be outside dstRoot.
-// Opened via Openat2 as RESOLVE_NO_SYMLINKS / O_NOFOLLOW.
-func MvToRoot(dstRoot *os.Root, src string, dst string, attr *Attr) error {
+// mvIntoRoot moves given src (which may be outside root) to given dst within dstRoot.
+func mvIntoRoot(dstRoot *os.Root, src string, dst string, attr *Attr) error {
 	if dstRoot == nil {
 		return ErrPathRoot
 	}
@@ -473,9 +553,10 @@ func MvToRoot(dstRoot *os.Root, src string, dst string, attr *Attr) error {
 		}
 	}()
 
+	// #nosec G115 -- os file desc.
 	dstFd := int(dstFile.Fd())
 
-	if err := copyFd(srcFd, dstFd); err != nil {
+	if err := cpFd(srcFd, dstFd); err != nil {
 		return ErrFileCopy
 	}
 
@@ -483,7 +564,7 @@ func MvToRoot(dstRoot *os.Root, src string, dst string, attr *Attr) error {
 		return fmt.Errorf("%w, %v, %v", ErrFileSync, err, dst)
 	}
 
-	if err := applyAttrAt(dstRoot, dstName, attr); err != nil {
+	if err := applyAttr(dstRoot, dstName, attr); err != nil {
 		return err
 	}
 
@@ -542,10 +623,10 @@ func Mv(src string, dst string, attr *Attr) error {
 	}
 	defer CloseFd(dstParentFd)
 
-	return copyRemoveFile(srcParentFd, srcName, dstParentFd, dstName, attr)
+	return cpDel(srcParentFd, srcName, dstParentFd, dstName, attr)
 }
 
-func copyRemoveFile(srcParentFd int, srcPath string, dstParentFd int, dstPath string, attr *Attr) error {
+func cpDel(srcParentFd int, srcPath string, dstParentFd int, dstPath string, attr *Attr) error {
 	var (
 		closed bool
 		keep   bool
@@ -613,7 +694,7 @@ func copyRemoveFile(srcParentFd int, srcPath string, dstParentFd int, dstPath st
 		}
 	}()
 
-	if err := copyFd(srcFd, dstFd); err != nil {
+	if err := cpFd(srcFd, dstFd); err != nil {
 		return ErrFileCopy
 	}
 
@@ -670,7 +751,7 @@ func openDir(path string) (int, error) {
 	return fd, nil
 }
 
-func copyFd(srcFd int, dstFd int) error {
+func cpFd(srcFd int, dstFd int) error {
 	buff := make([]byte, 8<<20)
 
 	for {

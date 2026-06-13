@@ -79,7 +79,10 @@ func (cfg *Cfg) Validate() error {
 	var targets []*regexp.Regexp
 
 	for _, target := range cfg.Scans.Targets {
-		re := regexp.MustCompile(target)
+		re, err := regexp.Compile(target)
+		if err != nil {
+			return fmt.Errorf("%w, %v", ErrReTarget, err)
+		}
 
 		targets = append(targets, re)
 	}
@@ -153,6 +156,7 @@ func Mock(paths *path.Paths, dir string) (*Cfg, error) {
 	}
 
 	for _, path := range files {
+		// #nosec G304 -- trusted internal cfg paths.
 		if _, err := os.Create(path); err != nil {
 			return nil, err
 		}

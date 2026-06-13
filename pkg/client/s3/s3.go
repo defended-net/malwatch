@@ -71,6 +71,7 @@ func (transport *Transport) Dl(path string, attr *fsys.Attr) error {
 		return err
 	}
 
+	// #nosec G115 -- os file desc.
 	file := os.NewFile(uintptr(fd), path)
 	defer fsys.Close(file)
 

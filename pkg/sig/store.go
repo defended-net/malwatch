@@ -48,7 +48,14 @@ func Acquire() (*Sigs, error) {
 		}
 
 		if atomic.CompareAndSwapInt64(&sigs.refs, refs, refs+1) {
-			return sigs, nil
+			if curr.Load() == sigs {
+				return sigs, nil
+			}
+
+			sigs.Release()
+			runtime.Gosched()
+
+			continue
 		}
 
 		// Cmp failed, retry.

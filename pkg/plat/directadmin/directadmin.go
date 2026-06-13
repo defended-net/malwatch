@@ -160,12 +160,7 @@ func (plat *Plat) DocRoots() ([]string, error) {
 		return nil, fmt.Errorf("%w, %v", ErrAPIRespCode, resp.StatusCode)
 	}
 
-	body, err := io.ReadAll(io.LimitReader(resp.Body, bodySz))
-	if err != nil {
-		return nil, err
-	}
-
-	if err := json.Unmarshal(body, info); err != nil {
+	if err := json.NewDecoder(io.LimitReader(resp.Body, bodySz)).Decode(info); err != nil {
 		return nil, fmt.Errorf("%w, %v", ErrAPIDomInfoUnmarshal, err)
 	}
 

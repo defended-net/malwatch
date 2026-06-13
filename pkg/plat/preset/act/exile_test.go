@@ -52,6 +52,10 @@ func TestExileLoad(t *testing.T) {
 		t.Skip("s3 secret not stored")
 	}
 
+	if env.Cfg.Secrets.S3.Endpoint == "" {
+		t.Skip("s3 secret not stored")
+	}
+
 	input := NewExiler(env)
 
 	if got := input.Load(nil); got != nil {
@@ -112,6 +116,10 @@ func TestExile(t *testing.T) {
 		t.Skip("s3 secret not stored")
 	}
 
+	if env.Cfg.Secrets.S3.Endpoint == "" {
+		t.Skip("s3 secret not stored")
+	}
+
 	file, err := os.Create(filepath.Join(t.TempDir(), t.Name()))
 	if err != nil {
 		t.Fatalf("file create err %v", err)
@@ -164,6 +172,10 @@ func TestExileRemoved(t *testing.T) {
 	env, err := env.Mock(t.Name(), t.TempDir())
 	if err != nil {
 		t.Fatalf("env mock err %s", err)
+	}
+
+	if env.Cfg.Secrets.S3.Endpoint == "" {
+		t.Skip("s3 secret not stored")
 	}
 
 	if env.Cfg.Secrets.S3.Endpoint == "" {

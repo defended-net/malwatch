@@ -191,7 +191,7 @@ func Mock(name string, dir string) (*Plat, error) {
 		},
 
 		cfg: &Cfg{
-			path: filepath.Join(env.Paths.Plat.Dir, "directadmin.toml"),
+			path: filepath.Join(env.Paths.Plat.Dir, "cpanel.toml"),
 		},
 
 		bin: "echo",

@@ -27,13 +27,11 @@ import (
 
 // Cleaner represents cleaning.
 type Cleaner struct {
-	verb    string
-	dir     string
-	blkSz   int
-	expr    act.Clean
-	rules   string
-	scanner *yr.Scanner
-	root    *os.Root
+	verb  string
+	dir   string
+	blkSz int
+	expr  act.Clean
+	root  *os.Root
 }
 
 type token struct {
@@ -44,11 +42,11 @@ type token struct {
 // NewCleaner returns cleaner for given env.
 func NewCleaner(env *env.Env) *Cleaner {
 	return &Cleaner{
-		verb:  VerbClean,
-		dir:   env.Cfg.Acts.Quarantine.Dir,
+		verb: VerbClean,
+		dir:  env.Cfg.Acts.Quarantine.Dir,
+		// #nosec G404 -- non crypto jitter.
 		blkSz: int(float64(env.Cfg.Scans.BlkSz) * (0.8 + rand.Float64()*0.2)),
 		expr:  env.Cfg.Acts.Clean,
-		rules: env.Paths.Sigs.Yrc,
 	}
 }
 
@@ -65,18 +63,6 @@ func (cleaner *Cleaner) Load(_ *os.Root) error {
 			}
 		}
 	}
-
-	rules, err := yr.LoadRules(cleaner.rules)
-	if err != nil {
-		return fmt.Errorf("%w, %v", sig.ErrYrcGet, err)
-	}
-
-	cleaner.scanner, err = yr.NewScanner(rules)
-	if err != nil {
-		return fmt.Errorf("%w, %v", sig.ErrYrScanner, err)
-	}
-
-	cleaner.scanner.SetFlags(yr.ScanFlagsFastMode)
 
 	root, err := os.OpenRoot(cleaner.dir)
 	if err != nil {
@@ -98,8 +84,22 @@ func (cleaner *Cleaner) Act(result *state.Result) error {
 		return fsys.ErrPathRoot
 	}
 
+	sigs, err := sig.Acquire()
+	if err != nil {
+		return fmt.Errorf("%w, %v", sig.ErrYrcGet, err)
+	}
+	defer sigs.Release()
+
+	scanner, err := yr.NewScanner(sigs.Rules)
+	if err != nil {
+		return fmt.Errorf("%w, %v", sig.ErrYrScanner, err)
+	}
+	defer scanner.Destroy()
+
+	scanner.SetFlags(yr.ScanFlagsFastMode)
+
 	for path, meta := range result.Paths {
-		if err := cleaner.clean(path, meta); err != nil {
+		if err := cleaner.clean(path, meta, scanner); err != nil {
 			result.AddErr(fmt.Errorf("%w, %v, %v", ErrCleanFail, err, path))
 		}
 	}
@@ -108,7 +108,7 @@ func (cleaner *Cleaner) Act(result *state.Result) error {
 }
 
 // clean cleans a given path with given hit meta.
-func (cleaner *Cleaner) clean(path string, meta *hit.Meta) error {
+func (cleaner *Cleaner) clean(path string, meta *hit.Meta, scanner *yr.Scanner) error {
 	fd, _, err := fsys.Open(path)
 	if err != nil {
 		return fmt.Errorf("%w, %v", err, path)
@@ -121,7 +121,7 @@ func (cleaner *Cleaner) clean(path string, meta *hit.Meta) error {
 		return fmt.Errorf("%w, %v", ErrMv, err)
 	}
 
-	cleaned, err := cleaner.transform(meta)
+	cleaned, err := cleaner.transform(meta, scanner)
 	if err != nil {
 		return err
 	}
@@ -140,7 +140,7 @@ func (cleaner *Cleaner) clean(path string, meta *hit.Meta) error {
 }
 
 // transform transforms given meta.
-func (cleaner *Cleaner) transform(meta *hit.Meta) (string, error) {
+func (cleaner *Cleaner) transform(meta *hit.Meta, scanner *yr.Scanner) (string, error) {
 	var (
 		clean = filepath.Clean(meta.Status + "-clean")
 		ok    bool
@@ -176,6 +176,8 @@ func (cleaner *Cleaner) transform(meta *hit.Meta) (string, error) {
 		}
 	}()
 
+	var engines []*sed.Engine
+
 	for _, rule := range meta.Rules {
 		exprs, has := cleaner.expr[rule]
 		if !has {
@@ -184,9 +186,22 @@ func (cleaner *Cleaner) transform(meta *hit.Meta) (string, error) {
 
 		slog.Info("attempting clean", "rule", rule, "path", meta.Status)
 
-		if err := cleaner.apply(srcF, dstF, rule, exprs); err != nil {
-			return "", err
+		for _, expr := range exprs {
+			if err := isSafeExpr(expr); err != nil {
+				return "", err
+			}
+
+			engine, err := sed.New(strings.NewReader(expr))
+			if err != nil {
+				return "", fmt.Errorf("%w, %v,", ErrCleanExprCompile, err)
+			}
+
+			engines = append(engines, engine)
 		}
+	}
+
+	if err := cleaner.apply(srcF, dstF, meta.Rules, engines, scanner); err != nil {
+		return "", err
 	}
 
 	ok = true
@@ -194,26 +209,12 @@ func (cleaner *Cleaner) transform(meta *hit.Meta) (string, error) {
 	return clean, nil
 }
 
-// apply execs given exprs against src to dst.
-func (cleaner *Cleaner) apply(src *os.File, dst *os.File, rule string, exprs []string) error {
+// apply streams src to dst with every engine.
+func (cleaner *Cleaner) apply(src *os.File, dst *os.File, rules []string, engines []*sed.Engine, scanner *yr.Scanner) error {
 	var (
-		engines = make([]*sed.Engine, len(exprs))
 		matches = &yr.MatchRules{}
 		buff    = make([]byte, cleaner.blkSz)
 	)
-
-	for idx, expr := range exprs {
-		if err := isSafeExpr(expr); err != nil {
-			return err
-		}
-
-		engine, err := sed.New(strings.NewReader(expr))
-		if err != nil {
-			return fmt.Errorf("%w, %v,", ErrCleanExprCompile, err)
-		}
-
-		engines[idx] = engine
-	}
 
 	for {
 		offset, err := src.Read(buff)
@@ -230,14 +231,16 @@ func (cleaner *Cleaner) apply(src *os.File, dst *os.File, rule string, exprs []s
 
 			*matches = yr.MatchRules{}
 
-			cleaner.scanner.SetCallback(matches)
+			scanner.SetCallback(matches)
 
-			if err = cleaner.scanner.ScanMem([]byte(data)); err != nil {
+			if err = scanner.ScanMem([]byte(data)); err != nil {
 				return err
 			}
 
-			if sig.HasMatch(matches, rule) {
-				return fmt.Errorf("%w, %v", ErrCleanFail, src.Name())
+			for _, rule := range rules {
+				if sig.HasMatch(matches, rule) {
+					return fmt.Errorf("%w, %v", ErrCleanFail, src.Name())
+				}
 			}
 
 			if _, err = dst.WriteString(data); err != nil {
