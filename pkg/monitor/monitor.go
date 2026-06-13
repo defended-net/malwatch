@@ -95,6 +95,7 @@ func Run(env *env.Env) error {
 		if !timer.Stop() {
 			select {
 			case <-timer.C:
+
 			default:
 			}
 		}
