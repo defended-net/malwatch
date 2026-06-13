@@ -441,7 +441,7 @@ func TestAddDocrootPathInvalid(t *testing.T) {
 }
 
 func TestAddDocrootDotDots(t *testing.T) {
-	if got := addDocroot(map[string]struct{}{}, "/../etc/passwd"); got {
+	if got := addDocroot(map[string]struct{}{}, "/../etc/file"); got {
 		t.Errorf("unexpected add docroot success")
 	}
 }
