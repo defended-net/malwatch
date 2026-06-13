@@ -149,7 +149,7 @@ func TestUlErrs(t *testing.T) {
 		},
 
 		"dot-dots": {
-			key:  "/../etc/passwd",
+			key:  "/../etc/file",
 			file: file,
 			want: fsys.ErrPathTraverse,
 		},
@@ -246,7 +246,7 @@ func TestDlErrs(t *testing.T) {
 		},
 
 		"dot-dots": {
-			input: "/../etc/passwd",
+			input: "/../etc/file",
 			want:  fsys.ErrPathTraverse,
 		},
 
