@@ -9,7 +9,7 @@
   <h2 align="center">Fast and lightweight malware scanning</h2>
 </p>
 
-![GitHub License](https://img.shields.io/github/license/defended-net/malwatch) [![Go Report Card](https://goreportcard.com/badge/github.com/defended-net/malwatch)](https://goreportcard.com/report/github.com/defended-net/malwatch)
+![GitHub License](https://img.shields.io/github/license/defended-net/malwatch)
 
 Malwatch is a fast and lightweight malware scanner written in `go` for Linux based web server environments. It is capable of scaling to any requirements and is in production with some of the internet's largest deployments.
 
