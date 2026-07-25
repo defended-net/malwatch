@@ -30,8 +30,9 @@ type Worker struct {
 	matches matches
 	acts    *act.Cfg
 	buff    []byte
+	stat    *unix.Stat_t
+	maxAge  int
 	exp     time.Time
-	expFn   func(time.Time, int) (bool, *unix.Stat_t)
 }
 
 // matches represents matched rules.
@@ -39,19 +40,18 @@ type matches []string
 
 // New returns a worker from given cfg, rules and max file age.
 func New(cfg *base.Cfg) (*Worker, error) {
-	// #nosec G404 -- non crypto jitter.
-	blkSz := int(float64(cfg.Scans.BlkSz) * (0.8 + rand.Float64()*0.2))
+	var (
+		// #nosec G404 -- non crypto jitter.
+		blkSz = int(float64(cfg.Scans.BlkSz) * (0.8 + rand.Float64()*0.2))
 
-	worker := &Worker{
-		buff:  make([]byte, blkSz),
-		acts:  cfg.Acts,
-		exp:   time.Now().AddDate(0, 0, -cfg.Scans.MaxAge),
-		expFn: noop,
-	}
-
-	if cfg.Scans.MaxAge != 0 {
-		worker.expFn = fsys.IsExp
-	}
+		worker = &Worker{
+			acts:   cfg.Acts,
+			buff:   make([]byte, blkSz),
+			stat:   &unix.Stat_t{},
+			maxAge: cfg.Scans.MaxAge,
+			exp:    time.Now().AddDate(0, 0, -cfg.Scans.MaxAge),
+		}
+	)
 
 	if err := worker.Refresh(); err != nil {
 		return nil, err
@@ -95,8 +95,7 @@ func (worker *Worker) Scan(path string, result *state.Job) {
 	// nolint
 	defer unix.Close(fd)
 
-	exp, stat := worker.expFn(worker.exp, fd)
-	if exp {
+	if worker.maxAge != 0 && fsys.IsExp(worker.exp, fd, worker.stat) {
 		return
 	}
 
@@ -135,23 +134,18 @@ out:
 		return
 	}
 
-	// Reuse from beginning of fn, otherwise start from scratch.
-	if stat == nil {
-		stat = &unix.Stat_t{}
-
-		if err := unix.Fstat(fd, stat); err != nil {
-			result.AddErr(fmt.Errorf("%w, %v, %v", fsys.ErrStat, err, path))
-		}
-	}
-
 	matches := slices.Clone(worker.matches)
 	slices.Sort(matches)
+
+	if err := unix.Fstat(fd, worker.stat); err != nil {
+		result.AddErr(fmt.Errorf("%w, %v, %v", fsys.ErrStat, err, path))
+	}
 
 	result.Hits <- &state.Hit{
 		Path: path,
 
 		Meta: hit.NewMeta(
-			fsys.NewAttr(stat),
+			fsys.NewAttr(worker.stat),
 			matches,
 			worker.acts.NewVerbs(path, matches...)...,
 		),
@@ -198,10 +192,6 @@ func (matches *matches) RuleMatching(_ *yr.ScanContext, rule *yr.Rule) (bool, er
 	*matches = append(*matches, hit)
 
 	return len(*matches) > 3, nil
-}
-
-func noop(_ time.Time, _ int) (bool, *unix.Stat_t) {
-	return false, nil
 }
 
 // Mock mocks a worker.

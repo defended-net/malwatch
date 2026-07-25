@@ -15,11 +15,9 @@ import (
 )
 
 // IsExp verifies if given file has exceeded mtime. Timestomp protected.
-func IsExp(expiry time.Time, fd int) (bool, *unix.Stat_t) {
-	stat := &unix.Stat_t{}
-
+func IsExp(expiry time.Time, fd int, stat *unix.Stat_t) bool {
 	if err := unix.Fstat(fd, stat); err != nil {
-		return false, nil
+		return false
 	}
 
 	var (
@@ -28,10 +26,10 @@ func IsExp(expiry time.Time, fd int) (bool, *unix.Stat_t) {
 	)
 
 	if cTime.Before(expiry) && mTime.Before(expiry) {
-		return true, nil
+		return true
 	}
 
-	return false, stat
+	return false
 }
 
 // IsRel verifies if given path is rel to given base paths.

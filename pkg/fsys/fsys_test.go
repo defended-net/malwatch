@@ -1172,7 +1172,10 @@ func TestIsExp(t *testing.T) {
 
 	for name, test := range tests {
 		t.Run(name, func(t *testing.T) {
-			input := filepath.Join(t.TempDir(), "file")
+			var (
+				input = filepath.Join(t.TempDir(), "file")
+				stat  = &unix.Stat_t{}
+			)
 
 			if _, err := os.Create(input); err != nil {
 				t.Fatalf("file create err %s", err)
@@ -1190,7 +1193,7 @@ func TestIsExp(t *testing.T) {
 			}
 			defer Close(file)
 
-			if got, _ := IsExp(test.ttl(), int(file.Fd())); got != test.want {
+			if got := IsExp(test.ttl(), int(file.Fd()), stat); got != test.want {
 				t.Errorf("unexpected is exp result %v, want %v", got, test.want)
 			}
 		})
@@ -1198,13 +1201,8 @@ func TestIsExp(t *testing.T) {
 }
 
 func TestIsExpErrs(t *testing.T) {
-	got, stat := IsExp(time.Now(), -1)
-	if got {
+	if got := IsExp(time.Now(), -1, &unix.Stat_t{}); got {
 		t.Errorf("unexpected is exp result %v, want false", got)
-	}
-
-	if stat != nil {
-		t.Errorf("unexpected stat %v, want nil", stat)
 	}
 }
 
