@@ -9,7 +9,7 @@
   <h2 align="center">Fast and lightweight malware scanning</h2>
 </p>
 
-![GitHub License](https://img.shields.io/github/license/defended-net/malwatch) [![Go Report Card](https://goreportcard.com/badge/github.com/defended-net/malwatch)](https://goreportcard.com/report/github.com/defended-net/malwatch)
+![GitHub License](https://img.shields.io/github/license/defended-net/malwatch)
 
 Malwatch is a fast and lightweight malware scanner written in `go` for Linux based web server environments. It is capable of scaling to any requirements and is in production with some of the internet's largest deployments.
 
@@ -38,9 +38,9 @@ There is tremendous value if malwatch is elected to replace your fleet's existin
 
 Create a directory anywhere you prefer, software is meant to be portable. A common choice is `/opt/malwatch`. Then extract the binary there from the downloaded archive:
 
-    wget https://github.com/defended-net/malwatch/releases/download/v1.5.1/malwatch_1.5.1_linux_amd64.tar.gz
+    wget https://github.com/defended-net/malwatch/releases/download/v1.5.2/malwatch_1.5.2_linux_amd64.tar.gz
     mkdir /opt/malwatch
-    tar -C /opt/malwatch -xzvf malwatch_1.5.1_linux_amd64.tar.gz
+    tar -C /opt/malwatch -xzvf malwatch_1.5.2_linux_amd64.tar.gz
 
 It would be recommended to integrate it with your `PATH`:
 
