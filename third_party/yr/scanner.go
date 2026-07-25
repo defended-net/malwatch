@@ -39,6 +39,9 @@ type Scanner struct {
 	// userData stores handle of the currently set callback object. It is
 	// allocated using malloc so that the GC does not mess with it.
 	userData *cgoHandle
+	// prepared tracks whether callback and flags have been set on the
+	// underlying C scanner. Reset when Callback or flags change.
+	prepared bool
 }
 
 // Creates a new error that includes information a about the rule
@@ -85,6 +88,7 @@ func (s *Scanner) Destroy() {
 		C.free(unsafe.Pointer(s.userData))
 		s.userData = nil
 	}
+	s.prepared = false
 	runtime.SetFinalizer(s, nil)
 }
 
@@ -123,6 +127,7 @@ func (s *Scanner) DefineVariable(identifier string, value interface{}) (err erro
 // SetFlags sets flags for the scanner.
 func (s *Scanner) SetFlags(flags ScanFlags) *Scanner {
 	s.flags = flags
+	s.prepared = false
 	return s
 }
 
@@ -134,12 +139,13 @@ func (s *Scanner) SetTimeout(timeout time.Duration) *Scanner {
 
 // SetCallback sets a callback object for the scanner. For every event
 // emitted by libyara during subsequent scan, the appropriate method
-// on the ScanCallback object is called.
+// on the ScanCallback object will be called.
 //
 // For the common case where only a list of matched rules is relevant,
 // setting a callback object is not necessary.
 func (s *Scanner) SetCallback(cb ScanCallback) *Scanner {
 	s.Callback = cb
+	s.prepared = false
 	return s
 }
 
@@ -168,16 +174,19 @@ func (s *Scanner) ScanMem(buf []byte) (err error) {
 	if len(buf) > 0 {
 		ptr = (*C.uint8_t)(unsafe.Pointer(&(buf[0])))
 	}
-	s.putCallbackData()
-	// SCAN_FLAGS_NO_TRYCATCH disables the YARA's exception handler that
-	// captures segfaults. Capturing these exceptions only makes sense
-	// while scanning memory-mapped files. When scanning in-memory data
-	// the excepton-handling mechanism doesn't have any benefit and only
-	// causes trouble, as it can interfere with golang's ability to detect
-	// null-pointer dereferences and panic accordingly.
-	C.yr_scanner_set_flags(
-		s.cptr,
-		s.flags.withReportFlags(s.Callback)|C.SCAN_FLAGS_NO_TRYCATCH)
+	if !s.prepared {
+		s.putCallbackData()
+		// SCAN_FLAGS_NO_TRYCATCH disables the YARA's exception handler that
+		// captures segfaults. Capturing these exceptions only makes sense
+		// while scanning memory-mapped files. When scanning in-memory data
+		// the excepton-handling mechanism doesn't have any benefit and only
+		// causes trouble, as it can interfere with golang's ability to detect
+		// null-pointer dereferences and panic accordingly.
+		C.yr_scanner_set_flags(
+			s.cptr,
+			s.flags.withReportFlags(s.Callback)|C.SCAN_FLAGS_NO_TRYCATCH)
+		s.prepared = true
+	}
 	err = s.newScanError(C.yr_scanner_scan_mem(
 		s.cptr,
 		ptr,
