@@ -6,7 +6,7 @@ require (
 	github.com/BurntSushi/toml v1.6.0
 	github.com/alexeyco/simpletable v1.0.0
 	github.com/caarlos0/env/v11 v11.4.1
-	github.com/go-git/go-git/v5 v5.19.0
+	github.com/go-git/go-git/v5 v5.19.1
 	github.com/minio/minio-go/v7 v7.1.0
 	github.com/rwtodd/Go.Sed v0.0.0-20190103233418-906bc69c9394
 	github.com/wneessen/go-mail v0.7.2
