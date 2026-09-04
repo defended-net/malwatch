@@ -68,8 +68,12 @@ func (job *Job) Walk(ctx context.Context, skips *act.Skips, sz int) <-chan strin
 		defer close(queue)
 
 		for _, entry := range append(job.paths.Dirs, job.paths.Files...) {
-			if ctx.Err() != nil {
+			switch {
+			case ctx.Err() != nil:
 				return
+
+			case skips.HasDir(entry):
+				continue
 			}
 
 			if err := filepath.WalkDir(entry, func(path string, info os.DirEntry, err error) error {
@@ -79,13 +83,10 @@ func (job *Job) Walk(ctx context.Context, skips *act.Skips, sz int) <-chan strin
 
 					return nil
 
-				case fsys.IsRel(path, skips.Dirs...):
+				case info.IsDir() && path != entry && skips.HasDir(path):
 					return filepath.SkipDir
 
-				case skips.HasFile(path):
-					return nil
-
-				case !info.Type().IsRegular():
+				case !info.Type().IsRegular(), skips.HasFile(path):
 					return nil
 				}
 
