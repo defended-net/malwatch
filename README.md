@@ -38,9 +38,9 @@ There is tremendous value if malwatch is elected to replace your fleet's existin
 
 Create a directory anywhere you prefer, software is meant to be portable. A common choice is `/opt/malwatch`. Then extract the binary there from the downloaded archive:
 
-    wget https://github.com/defended-net/malwatch/releases/download/v1.5.2/malwatch_1.5.2_linux_amd64.tar.gz
+    wget https://github.com/defended-net/malwatch/releases/download/v1.5.3/malwatch_1.5.3_linux_amd64.tar.gz
     mkdir /opt/malwatch
-    tar -C /opt/malwatch -xzvf malwatch_1.5.2_linux_amd64.tar.gz
+    tar -C /opt/malwatch -xzvf malwatch_1.5.3_linux_amd64.tar.gz
 
 It would be recommended to integrate it with your `PATH`:
 
@@ -93,7 +93,11 @@ Malwatch can operate as standalone or easily be compatible with any setup.
 
 - cPanel
 
-cPanel is included as a drop - in platform integration. It can be enabled by renaming the file `cfg/platform/cpanel.disabled` to `cfg/platform/cpanel.toml`. No further configuration is needed for it to work.
+To enable: rename`cfg/platform/cpanel.disabled` to `cfg/platform/cpanel.toml`. No further configuration is necessary.
+
+- DirectAdmin
+
+To enable: rename`cfg/platform/directadmin.disabled` to `cfg/platform/directadmin.toml`. No further configuration is necessary.
 
 # Documentation
 

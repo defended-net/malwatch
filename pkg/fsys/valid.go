@@ -44,6 +44,27 @@ func IsRel(path string, bases ...string) bool {
 	return false
 }
 
+// IsUnder verifies if given path is descendent of base paths.
+func IsUnder(path string, bases ...string) bool {
+	for _, base := range bases {
+		switch {
+		case base == "", !strings.HasPrefix(path, base):
+			continue
+
+		case len(path) == len(base):
+			return true
+
+		case base[len(base)-1] == filepath.Separator:
+			return true
+
+		case path[len(base)] == filepath.Separator:
+			return true
+		}
+	}
+
+	return false
+}
+
 // HasDotDots validates given paths for dot dots, rel, root or curr dir.
 func HasDotDots(paths ...string) error {
 	for _, path := range paths {

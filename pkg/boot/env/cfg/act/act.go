@@ -345,7 +345,7 @@ func GetSkips(cfg *Cfg, paths *path.Paths) *Skips {
 
 	for _, path := range dirs {
 		if path != "" && path != "." {
-			skips.Dirs = append(skips.Dirs, path)
+			skips.Dirs = append(skips.Dirs, filepath.Clean(path))
 		}
 	}
 
@@ -364,7 +364,8 @@ func GetSkips(cfg *Cfg, paths *path.Paths) *Skips {
 		}
 
 		if stat.IsDir() {
-			skips.Dirs = append(skips.Dirs, strings.TrimSuffix(path, "/"))
+			skips.Dirs = append(skips.Dirs, filepath.Clean(path))
+
 			continue
 		}
 
@@ -379,6 +380,11 @@ func (skips *Skips) HasFile(path string) bool {
 	_, ok := skips.Files[path]
 
 	return ok
+}
+
+// HasDir checks if given path is in skip dirs.
+func (skips *Skips) HasDir(path string) bool {
+	return fsys.IsUnder(path, skips.Dirs...)
 }
 
 // Mock mocks a cfg.
