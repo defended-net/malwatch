@@ -1,17 +1,17 @@
 module github.com/defended-net/malwatch
 
-go 1.25.9
+go 1.26.0
 
 require (
 	github.com/BurntSushi/toml v1.6.0
 	github.com/alexeyco/simpletable v1.0.0
 	github.com/caarlos0/env/v11 v11.4.1
-	github.com/go-git/go-git/v5 v5.19.1
+	github.com/go-git/go-git/v5 v5.19.2
 	github.com/minio/minio-go/v7 v7.1.0
 	github.com/rwtodd/Go.Sed v0.0.0-20190103233418-906bc69c9394
 	github.com/wneessen/go-mail v0.7.2
 	go.etcd.io/bbolt v1.4.3
-	golang.org/x/sys v0.45.0
+	golang.org/x/sys v0.47.0
 )
 
 require (
@@ -46,8 +46,8 @@ require (
 	github.com/xanzy/ssh-agent v0.3.3 // indirect
 	github.com/zeebo/xxh3 v1.1.0 // indirect
 	go.yaml.in/yaml/v3 v3.0.4 // indirect
-	golang.org/x/crypto v0.52.0 // indirect
-	golang.org/x/net v0.54.0 // indirect
-	golang.org/x/text v0.39.0 // indirect
+	golang.org/x/crypto v0.56.0 // indirect
+	golang.org/x/net v0.57.0 // indirect
+	golang.org/x/text v0.41.0 // indirect
 	gopkg.in/warnings.v0 v0.1.2 // indirect
 )
