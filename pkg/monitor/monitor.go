@@ -156,7 +156,7 @@ func (monitor *Monitor) listen(ctx context.Context) {
 		}
 
 		// Check dir skips.
-		if fsys.IsRel(path, monitor.skips.Dirs...) {
+		if monitor.skips.HasDir(path) {
 			continue
 		}
 
