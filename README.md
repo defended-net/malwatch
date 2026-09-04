@@ -93,7 +93,11 @@ Malwatch can operate as standalone or easily be compatible with any setup.
 
 - cPanel
 
-cPanel is included as a drop - in platform integration. It can be enabled by renaming the file `cfg/platform/cpanel.disabled` to `cfg/platform/cpanel.toml`. No further configuration is needed for it to work.
+To enable: rename`cfg/platform/cpanel.disabled` to `cfg/platform/cpanel.toml`. No further configuration is necessary.
+
+- DirectAdmin
+
+To enable: rename`cfg/platform/directadmin.disabled` to `cfg/platform/directadmin.toml`. No further configuration is necessary.
 
 # Documentation
 
