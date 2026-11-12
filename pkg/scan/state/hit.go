@@ -36,6 +36,8 @@ func Group(target string, hits []*Hit) []*Result {
 	results := make([]*Result, 0, len(grouped))
 
 	for _, result := range grouped {
+		result.Total = len(result.Paths)
+
 		results = append(results, result)
 	}
 

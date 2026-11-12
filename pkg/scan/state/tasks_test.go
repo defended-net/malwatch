@@ -110,9 +110,51 @@ func TestSave(t *testing.T) {
 }
 
 func TestLog(t *testing.T) {
-	input := &Result{}
+	tests := map[string]struct {
+		input *Result
+	}{
+		"none": {
+			input: &Result{},
+		},
 
-	if got := input.Log(); got != nil {
-		t.Errorf("unexpected log err %v, want %v", got, nil)
+		"one": {
+			input: NewResult(
+				"fs",
+
+				Paths{
+					"/fs/index.php": {
+						Rules: []string{"rule"},
+					},
+				},
+			),
+		},
+
+		"compound": {
+			input: NewResult(
+				"fs",
+
+				Paths{
+					"/fs/index.php": {
+						Rules: []string{"rule"},
+					},
+
+					"/fs/index-b.php": {
+						Rules: []string{"rule-b"},
+					},
+
+					"/fs/index-c.php": {
+						Rules: []string{"rule-c"},
+					},
+				},
+			),
+		},
+	}
+
+	for name, test := range tests {
+		t.Run(name, func(t *testing.T) {
+			if got := test.input.Log(); got != nil {
+				t.Errorf("log err %v", got)
+			}
+		})
 	}
 }
