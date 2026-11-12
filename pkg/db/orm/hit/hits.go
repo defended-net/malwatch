@@ -6,6 +6,7 @@ package hit
 import (
 	"encoding/json"
 	"fmt"
+	"log/slog"
 	"path/filepath"
 	"strconv"
 	"strings"
@@ -49,6 +50,37 @@ func NewMeta(attr *fsys.Attr, matches []string, verbs ...string) *Meta {
 		Attr:  attr,
 		Acts:  verbs,
 	}
+}
+
+// LogVal returns slog val for given meta.
+func (meta *Meta) LogVal() slog.Value {
+	if meta == nil {
+		return slog.GroupValue()
+	}
+
+	attr := slog.GroupValue()
+
+	if meta.Attr != nil {
+		attr = slog.GroupValue(
+			slog.Int("uid", meta.Attr.UID),
+			slog.Int("gid", meta.Attr.GID),
+			slog.Any("mode", meta.Attr.Mode),
+			slog.Time("ctime", meta.Attr.CTime),
+			slog.Time("mtime", meta.Attr.MTime),
+		)
+	}
+
+	return slog.GroupValue(
+		slog.Time("time", meta.Time),
+		slog.Any("rules", meta.Rules),
+		slog.String("status", meta.Status),
+
+		slog.Attr{
+			Key: "attr", Value: attr,
+		},
+
+		slog.Any("acts", meta.Acts),
+	)
 }
 
 // SelectAll returns all hits.
