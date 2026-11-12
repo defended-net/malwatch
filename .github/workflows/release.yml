@@ -1,0 +1,152 @@
+name: release
+
+on:
+  push:
+    tags: ["v*"]
+
+permissions:
+  contents: read
+
+concurrency:
+  group: ${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: false
+
+jobs:
+  build:
+    name: build
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    permissions:
+      contents: read
+    env:
+      VERSION: ${{ github.ref_name }}
+
+    steps:
+      - name: validate tag
+        env:
+          LC_ALL: C
+        run: |
+          num='(0|[1-9][0-9]*)'
+          pre='(0|[1-9][0-9]*|[0-9]*[a-zA-Z-][0-9a-zA-Z-]*)'
+          meta='[0-9a-zA-Z-]+'
+          semver="^v$num\.$num\.$num(-$pre(\.$pre)*)?(\+$meta(\.$meta)*)?$"
+          if [[ ! "$VERSION" =~ $semver ]]; then
+            echo "::error::tag $VERSION not semver"
+            exit 1
+          fi
+
+      - name: checkout
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+          fetch-depth: 0
+
+      - name: setup go
+        uses: actions/setup-go@b7ad1dad31e06c5925ef5d2fc7ad053ef454303e # v7.0.0
+        with:
+          go-version-file: go.mod
+          cache: false
+
+      - name: setup nfpm
+        run: go install github.com/goreleaser/nfpm/v2/cmd/nfpm@v2.47.0
+
+      - name: setup musl
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y --no-install-recommends musl-tools cmake
+
+      - name: setup mimalloc
+        env:
+          MIMALLOC_TAG: v3.1.5
+          MIMALLOC_COMMIT: dfa50c37d951128b1e77167dd9291081aa88eea4
+        run: |
+          git clone --filter=blob:none https://github.com/microsoft/mimalloc.git /tmp/mimalloc
+          cd /tmp/mimalloc
+          git checkout "$MIMALLOC_COMMIT"
+          [ "$(git rev-parse HEAD)" = "$MIMALLOC_COMMIT" ]
+          [ "$(git rev-list -n 1 "refs/tags/$MIMALLOC_TAG")" = "$MIMALLOC_COMMIT" ]
+          CC=musl-gcc cmake . -Bbuild -DMI_OVERRIDE=ON -DMI_BUILD_SHARED=OFF -DMI_BUILD_TESTS=OFF \
+            -DCMAKE_C_FLAGS="-DMI_OPTION_LARGE_OS_PAGES_DEFAULT=0"
+          cmake --build build
+          mkdir -p "$GITHUB_WORKSPACE/third_party/mimalloc/lib" "$GITHUB_WORKSPACE/third_party/mimalloc/inc"
+          cp build/libmimalloc.a "$GITHUB_WORKSPACE/third_party/mimalloc/lib/"
+          cp include/*.h "$GITHUB_WORKSPACE/third_party/mimalloc/inc/"
+
+      - name: build
+        env:
+          CGO_ENABLED: "1"
+          GOOS: linux
+          GOARCH: amd64
+          CC: musl-gcc
+        run: |
+          ver="${VERSION#v}"
+          mkdir -p out
+          for bin in malwatch malwatch-monitor; do
+            go build -trimpath -o "out/$bin" \
+              -ldflags "-w -s -linkmode external \
+                -extldflags '-static -I./third_party/mimalloc/inc -L./third_party/mimalloc/lib -lmimalloc' \
+                -X github.com/defended-net/malwatch/pkg/boot/env.ver=$ver" \
+              "./cmd/$bin"
+          done
+
+      - name: pkg
+        run: |
+          ver="${VERSION#v}"
+          mkdir -p dist
+          cp LICENSE README.md out/
+          tar --numeric-owner --owner=0 --group=0 -czf "dist/malwatch_${ver}_linux_amd64.tar.gz" -C out \
+            malwatch malwatch-monitor LICENSE README.md
+          nfpm package --config .github/nfpm.yml --packager deb --target dist
+          nfpm package --config .github/nfpm.yml --packager rpm --target dist
+          cp LICENSE README.md dist/
+          (cd dist && sha256sum * > checksums.txt)
+
+      - name: notes
+        run: |
+          prev=$(git describe --tags --abbrev=0 --match 'v*' "${GITHUB_REF_NAME}^")
+          mkdir notes
+          {
+            echo "## Changes"
+            git log --no-merges --pretty='* %h %s' "${prev}..${GITHUB_REF_NAME}"
+            echo
+            echo "**Full Changelog**: https://github.com/${GITHUB_REPOSITORY}/compare/${prev}...${GITHUB_REF_NAME}"
+            echo
+            echo "---"
+            echo
+            echo "Please review our [documentation](https://docs.defended.net/malwatch)."
+          } > notes/NOTES.md
+
+      - name: upload
+        uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
+        with:
+          name: dist
+          path: |
+            dist/
+            notes/
+          if-no-files-found: error
+          retention-days: 1
+
+  publish:
+    name: publish
+    needs: build
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    permissions:
+      contents: write
+
+    steps:
+      - name: download
+        uses: actions/download-artifact@9000827ccba6bdab643e8b6fd33ac0654aef8333 # v8.0.2
+        with:
+          name: dist
+
+      - name: release
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          gh release create "$GITHUB_REF_NAME" \
+            --repo "$GITHUB_REPOSITORY" \
+            --verify-tag \
+            --title "$GITHUB_REF_NAME" \
+            --notes-file notes/NOTES.md \
+            dist/*
