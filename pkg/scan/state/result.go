@@ -7,6 +7,7 @@ package state
 type Result struct {
 	Target string
 	Paths  Paths
+	Total  int
 	errs   *Errs `json:"-"`
 }
 

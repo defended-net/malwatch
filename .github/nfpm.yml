@@ -1,0 +1,49 @@
+name: malwatch
+arch: amd64
+platform: linux
+version: ${VERSION}
+version_schema: semver
+maintainer: Roscoe Skeens <rskeens@defended.net>
+description: Malware scanner for Linux web servers
+license: AGPL-3.0-or-later
+homepage: https://defended.net
+
+contents:
+  - src: out/malwatch
+    dst: /opt/malwatch/malwatch
+    file_info:
+      mode: 0755
+      owner: root
+      group: root
+
+  - src: out/malwatch-monitor
+    dst: /opt/malwatch/malwatch-monitor
+    file_info:
+      mode: 0755
+      owner: root
+      group: root
+
+  - src: out/LICENSE
+    dst: /opt/malwatch/LICENSE
+    file_info:
+      mode: 0644
+      owner: root
+      group: root
+
+  - src: out/README.md
+    dst: /opt/malwatch/README.md
+    file_info:
+      mode: 0644
+      owner: root
+      group: root
+
+  - src: /opt/malwatch/malwatch
+    dst: /usr/bin/malwatch
+    type: symlink
+
+  - src: /opt/malwatch/malwatch-monitor
+    dst: /usr/bin/malwatch-monitor
+    type: symlink
+
+scripts:
+  postinstall: .github/scripts/postinstall.sh

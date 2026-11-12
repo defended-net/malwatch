@@ -56,9 +56,17 @@ func (result *Result) Save(db *bbolt.DB) error {
 	return history.Save(db)
 }
 
-// Log logs given result's hits.
+// Log logs given result hits.
 func (result *Result) Log() error {
-	slog.Info("scan", "target", result.Target, "hits", result.Paths)
+	if result.Total == 0 {
+		return nil
+	}
+
+	for path, meta := range result.Paths {
+		slog.Info("hit", "target", result.Target, "path", path, "hit", meta)
+	}
+
+	slog.Info("scan", "target", result.Target, "total", result.Total)
 
 	return nil
 }

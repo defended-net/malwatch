@@ -45,11 +45,16 @@ func TestGroup(t *testing.T) {
 		)
 
 		want = []*Result{
-			NewResult("fs",
-				Paths{
+			{
+				Target: "fs",
+
+				Paths: Paths{
 					tmp: &hit.Meta{},
 				},
-			),
+
+				Total: 1,
+				errs:  &Errs{},
+			},
 		}
 	)
 
@@ -143,6 +148,8 @@ func TestGroupCompound(t *testing.T) {
 					dir1: &hit.Meta{},
 					dir2: &hit.Meta{},
 				},
+
+				Total: 2,
 
 				errs: &Errs{},
 			},
