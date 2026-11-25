@@ -5,6 +5,7 @@ package monitor
 
 import (
 	"context"
+	"errors"
 	"fmt"
 	"os"
 	"time"
@@ -15,7 +16,6 @@ import (
 	"github.com/defended-net/malwatch/pkg/boot/env"
 	"github.com/defended-net/malwatch/pkg/boot/env/cfg/act"
 	"github.com/defended-net/malwatch/pkg/boot/env/re"
-	"github.com/defended-net/malwatch/pkg/fsys"
 	"github.com/defended-net/malwatch/pkg/monitor/batch"
 	"github.com/defended-net/malwatch/pkg/scan"
 	"github.com/defended-net/malwatch/pkg/scan/job"
@@ -222,24 +222,43 @@ func (monitor *Monitor) addPaths(env *env.Env) error {
 		return err
 	}
 
-	for _, path := range paths {
-		mount, err := fsys.MntPoint(path)
-		if err != nil {
-			return fmt.Errorf("%w, %v, %v", ErrUnknownMnt, err, mount)
+	// Assume modern kernel.
+	var (
+		kind  = uint(unix.FAN_MARK_FILESYSTEM)
+		first = paths[0]
+	)
+
+	switch err := mark(notify, first, kind); {
+	case errors.Is(err, unix.EINVAL):
+		// Kernels before 4.20.
+		kind = unix.FAN_MARK_MOUNT
+
+		if err := mark(notify, first, kind); err != nil {
+			return err
 		}
 
-		if err = notify.Mark(
-			unix.FAN_MARK_ADD|
-				unix.FAN_MARK_MOUNT,
-			unix.FAN_CLOSE_WRITE,
-			unix.AT_FDCWD,
-			mount,
-		); err != nil {
-			return fmt.Errorf("%w, %v", ErrNotifierMark, err)
+	case err != nil:
+		return err
+	}
+
+	for _, path := range paths[1:] {
+		if err := mark(notify, path, kind); err != nil {
+			return err
 		}
 	}
 
 	return nil
+}
+
+func mark(notify *fan.Notify, path string, kind uint) error {
+	return notify.Mark(
+		unix.FAN_MARK_ADD|
+			kind|
+			unix.FAN_MARK_DONT_FOLLOW,
+		unix.FAN_CLOSE_WRITE,
+		unix.AT_FDCWD,
+		path,
+	)
 }
 
 // tick handles periodic batch processing and sig refresh.
