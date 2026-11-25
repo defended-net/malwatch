@@ -15,8 +15,11 @@ import (
 
 	"github.com/defended-net/malwatch/pkg/boot/env"
 	"github.com/defended-net/malwatch/pkg/boot/env/re"
+	"github.com/defended-net/malwatch/pkg/scan"
 	"github.com/defended-net/malwatch/pkg/scan/state"
 	"github.com/defended-net/malwatch/pkg/sig"
+	"github.com/defended-net/malwatch/third_party/fan"
+	"golang.org/x/sys/unix"
 )
 
 var sample = `X5O!P%@AP[4\PZX54(P^)7CC)7}$EICAR-STANDARD-ANTIVIRUS-TEST-FILE!$H+H*`
@@ -103,6 +106,127 @@ func TestRefresh(t *testing.T) {
 
 			if monitor.rev != test.want {
 				t.Errorf("wanted rev %d, want %d", monitor.rev, test.want)
+			}
+		})
+	}
+}
+
+func TestMark(t *testing.T) {
+	var (
+		dir = t.TempDir()
+
+		tests = map[string]struct {
+			path string
+			kind uint
+			want error
+		}{
+			"fs": {
+				path: dir,
+				kind: unix.FAN_MARK_FILESYSTEM,
+			},
+
+			"mnt": {
+				path: dir,
+				kind: unix.FAN_MARK_MOUNT,
+			},
+
+			"not-exist": {
+				path: filepath.Join(dir, "not-exist"),
+				kind: unix.FAN_MARK_MOUNT,
+				want: unix.ENOENT,
+			},
+		}
+	)
+
+	for name, test := range tests {
+		t.Run(name, func(t *testing.T) {
+			notify, err := fan.NewNotify(
+				unix.FAN_CLOEXEC|
+					unix.FAN_CLASS_NOTIF,
+
+				os.O_RDONLY|
+					unix.O_CLOEXEC,
+			)
+			if err != nil {
+				t.Fatalf("notify create error %v", err)
+			}
+
+			t.Cleanup(func() {
+				if err := notify.File.Close(); err != nil {
+					t.Fatalf("notify close error %v", err)
+				}
+			})
+
+			if got := mark(notify, test.path, test.kind); !errors.Is(got, test.want) {
+				t.Fatalf("unexpected mark err %v, want %v", got, test.want)
+			}
+		})
+	}
+}
+
+func TestAddPaths(t *testing.T) {
+	var (
+		env, err = env.Mock(t.Name(), t.TempDir())
+
+		first  = t.TempDir()
+		second = t.TempDir()
+	)
+
+	if err != nil {
+		t.Fatalf("env mock err %v", err)
+	}
+
+	t.Cleanup(func() {
+		if err := env.Paths.Install.Root.Close(); err != nil {
+			t.Errorf("close install root err %v", err)
+		}
+	})
+
+	tests := map[string]struct {
+		paths []string
+		want  error
+	}{
+		"one": {
+			paths: []string{first},
+		},
+
+		"many": {
+			paths: []string{
+				first,
+				second,
+			},
+		},
+
+		"not-exist": {
+			paths: []string{"not-exist"},
+			want:  scan.ErrNoScanPaths,
+		},
+	}
+
+	for name, test := range tests {
+		t.Run(name, func(t *testing.T) {
+			env.Cfg.Scans.Paths = test.paths
+
+			var (
+				input  Monitor
+				notify = input.notify
+				got    = input.addPaths(env)
+			)
+
+			if notify != nil {
+				t.Cleanup(func() {
+					if err := notify.File.Close(); err != nil {
+						t.Errorf("notify close err %v", err)
+					}
+				})
+			}
+
+			switch {
+			case !errors.Is(got, test.want):
+				t.Fatalf("unexpected add paths err %v, want %v", got, test.want)
+
+			case got == nil && input.notify == nil:
+				t.Fatalf("nil notify")
 			}
 		})
 	}
