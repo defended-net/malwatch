@@ -37,14 +37,14 @@ There is tremendous value if malwatch is elected to replace your fleet's existin
 # Install: Fedora / RHEL
 
 ```bash
-sudo dnf install https://github.com/defended-net/malwatch/releases/download/v1.6.0/malwatch-1.6.0-1.x86_64.rpm
+sudo dnf install https://github.com/defended-net/malwatch/releases/download/v1.6.1/malwatch-1.6.1-1.x86_64.rpm
 ```
 
 # Install: Debian / Ubuntu
 
 ```bash
 curl -fL -o malwatch.deb \
-  https://github.com/defended-net/malwatch/releases/download/v1.6.0/malwatch_1.6.0_amd64.deb &&
+  https://github.com/defended-net/malwatch/releases/download/v1.6.1/malwatch_1.6.1_amd64.deb &&
 sudo apt install ./malwatch.deb
 ```
 
@@ -53,9 +53,9 @@ sudo apt install ./malwatch.deb
 Create a directory anywhere you prefer, software is meant to be portable. A common choice is `/opt/malwatch`. Then extract the binary there from the downloaded archive:
 
 ```bash
-    wget https://github.com/defended-net/malwatch/releases/download/v1.6.0/malwatch_1.6.0_linux_amd64.tar.gz
+    wget https://github.com/defended-net/malwatch/releases/download/v1.6.1/malwatch_1.6.1_linux_amd64.tar.gz
     mkdir /opt/malwatch
-    tar -C /opt/malwatch -xzvf malwatch_1.6.0_linux_amd64.tar.gz
+    tar -C /opt/malwatch -xzvf malwatch_1.6.1_linux_amd64.tar.gz
 ```
 
 It would be recommended to integrate it with your `PATH`:
